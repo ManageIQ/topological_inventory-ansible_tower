@@ -1,15 +1,13 @@
 require "topological_inventory/ansible_tower/logging"
 require "topological_inventory/ansible_tower/connection"
-require "topological_inventory/ansible_tower/operations/core/sources_api_client"
-require "topological_inventory/ansible_tower/operations/core/topology_api_client"
+require "topological_inventory/providers/common/operations/endpoint_client"
 
 module TopologicalInventory
   module AnsibleTower
     module Operations
       module Core
-        class AnsibleTowerClient
+        class AnsibleTowerClient < TopologicalInventory::Providers::Common::Operations::EndpointClient
           include Logging
-          include Core::TopologyApiClient
 
           attr_accessor :connection_manager
 
@@ -17,9 +15,7 @@ module TopologicalInventory
           POLL_TIMEOUT = 1800
 
           def initialize(source_id, task_id, identity = nil)
-            self.identity   = identity
-            self.source_id  = source_id
-            self.task_id    = task_id
+            super(source_id, task_id, identity)
 
             self.connection_manager = TopologicalInventory::AnsibleTower::Connection.new
           end
@@ -49,11 +45,11 @@ module TopologicalInventory
           #       "providerControlParameters":{"namespace":"default"},
           #       ...
           #     }"
-          def order_service(job_type, job_template_id, order_params)
-            job_template = if job_type == 'workflow_job_template'
-                             ansible_tower.api.workflow_job_templates.find(job_template_id)
+          def order_service(service_offering, _service_plan, order_params)
+            job_template = if job_type(service_offering) == 'workflow_job_template'
+                             ansible_tower.api.workflow_job_templates.find(service_offering.source_ref)
                            else
-                             ansible_tower.api.job_templates.find(job_template_id)
+                             ansible_tower.api.job_templates.find(service_offering.source_ref)
                            end
 
             job = job_template.launch(job_values(order_params))
@@ -65,9 +61,8 @@ module TopologicalInventory
             job
           end
 
-          def wait_for_job_finished(task_id, job, context)
+          def wait_for_provision_complete(task_id, job, context)
             count = 0
-            last_status = nil
             timeout_count = POLL_TIMEOUT / SLEEP_POLL
             loop do
               job = if job.type == 'workflow_job'
@@ -76,9 +71,9 @@ module TopologicalInventory
                       ansible_tower.api.jobs.find(job.id)
                     end
 
-              if last_status != job.status
-                last_status = job.status
-                update_task(task_id, :state => "running", :status => job_status_to_task_status(job.status), :context => context.merge(:remote_status => job.status))
+              if context[:remote_status] != job.status
+                context[:remote_status] = job.status
+                update_task(task_id, :state => "running", :status => task_status_for(job), :context => context)
               end
 
               return job if job.finished.present?
@@ -90,8 +85,16 @@ module TopologicalInventory
             job
           end
 
-          def job_status_to_task_status(job_status)
-            case job_status
+          def source_ref_of(job)
+            job.id
+          end
+
+          def provisioned_successfully?(job)
+            job.status == "successful"
+          end
+
+          def task_status_for(job)
+            case job.status
             when 'error', 'failed' then 'error'
             else 'ok'
             end
@@ -101,28 +104,21 @@ module TopologicalInventory
 
           attr_accessor :identity, :task_id, :source_id
 
+          # Type defined by collector here:
+          # lib/topological_inventory/ansible_tower/parser/service_offering.rb:12
+          def job_type(service_offering)
+            job_type = service_offering.extra[:type] if service_offering.extra.present?
+
+            raise "Missing service_offering's type: #{service_offering.inspect}" if job_type.blank?
+            job_type
+          end
+
           def job_values(order_parameters)
             if order_parameters["service_parameters"].blank?
               {}
             else
               { :extra_vars => order_parameters["service_parameters"] }
             end
-          end
-
-          def sources_api
-            @sources_api ||= Core::SourcesApiClient.new(identity)
-          end
-
-          def default_endpoint
-            @default_endpoint ||= sources_api.fetch_default_endpoint(source_id)
-          end
-
-          def authentication
-            @authentication ||= sources_api.fetch_authentication(source_id, default_endpoint)
-          end
-
-          def verify_ssl_mode
-            default_endpoint.verify_ssl ? OpenSSL::SSL::VERIFY_PEER : OpenSSL::SSL::VERIFY_NONE
           end
 
           def ansible_tower

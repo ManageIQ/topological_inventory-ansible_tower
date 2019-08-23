@@ -24,37 +24,48 @@ RSpec.describe TopologicalInventory::AnsibleTower::Operations::Core::AnsibleTowe
     allow(ansible_tower_client).to receive(:logger).and_return(double('null_object').as_null_object)
   end
 
-  describe "#order_service_plan" do
+  describe "#order_service" do
     let(:job_templates) { double }
     let(:job_template) { double }
     let(:job) { double }
+    let(:service_offering) { double("service offering") }
 
     before do
+      allow(service_offering).to receive(:source_ref).and_return(1)
       allow(job_templates).to receive(:find).and_return(job_template)
       allow(job_template).to receive(:launch).and_return(job)
-      expect(job_template).to receive(:launch).with(:extra_vars => order_params['service_parameters'])
     end
 
     it "launches job_template and returns job" do
+      allow(service_offering).to receive(:extra).and_return({:type => 'job_template'})
       allow(@api).to receive(:job_templates).and_return(job_templates)
 
       expect(@api).to receive(:job_templates).once
+      expect(job_template).to receive(:launch).with(:extra_vars => order_params['service_parameters'])
 
-      svc_instance = ansible_tower_client.order_service("job_template", 1, order_params)
+      svc_instance = ansible_tower_client.order_service(service_offering, nil, order_params)
       expect(svc_instance).to eq(job)
     end
 
     it "launches workflow and returns workflow job" do
+      allow(service_offering).to receive(:extra).and_return({:type => 'workflow_job_template'})
       allow(@api).to receive(:workflow_job_templates).and_return(job_templates)
 
       expect(@api).to receive(:workflow_job_templates).once
+      expect(job_template).to receive(:launch).with(:extra_vars => order_params['service_parameters'])
 
-      svc_instance = ansible_tower_client.order_service("workflow_job_template", 1, order_params)
+      svc_instance = ansible_tower_client.order_service(service_offering, nil, order_params)
       expect(svc_instance).to eq(job)
+    end
+
+    it "raises error when service_offering doesn't have type" do
+      expect(service_offering).to receive(:extra).and_return(nil)
+
+      expect { ansible_tower_client.order_service(service_offering, nil, order_params) }.to raise_error("Missing service_offering's type: #{service_offering.inspect}")
     end
   end
 
-  describe "#wait_for_job_finished" do
+  describe "#wait_for_provision_complete" do
     before do
       @jobs, @job = double, double
       allow(@api).to receive(:jobs).and_return(@jobs)
@@ -75,7 +86,7 @@ RSpec.describe TopologicalInventory::AnsibleTower::Operations::Core::AnsibleTowe
       expect(@api).to receive(:jobs).exactly(1).times
       expect(@api).to receive(:workflow_jobs).exactly(0).times
 
-      job = ansible_tower_client.wait_for_job_finished(task_id, @job, {})
+      job = ansible_tower_client.wait_for_provision_complete(task_id, @job, {})
       expect(job.id).to eq(123)
     end
 
@@ -91,7 +102,7 @@ RSpec.describe TopologicalInventory::AnsibleTower::Operations::Core::AnsibleTowe
       expect(@api).to receive(:jobs).exactly(0).times
       expect(@api).to receive(:workflow_jobs).exactly(1).times
 
-      job = ansible_tower_client.wait_for_job_finished(task_id, @job, {})
+      job = ansible_tower_client.wait_for_provision_complete(task_id, @job, {})
       expect(job.id).to eq(123)
     end
 
@@ -101,7 +112,7 @@ RSpec.describe TopologicalInventory::AnsibleTower::Operations::Core::AnsibleTowe
       allow(@job).to receive(:finished).and_return(nil)
       expect(@jobs).to receive(:find).exactly((described_class::POLL_TIMEOUT / described_class::SLEEP_POLL).to_i).times
 
-      ansible_tower_client.wait_for_job_finished(task_id, @job, {})
+      ansible_tower_client.wait_for_provision_complete(task_id, @job, {})
     end
 
     it "updates task with job status" do
@@ -114,7 +125,7 @@ RSpec.describe TopologicalInventory::AnsibleTower::Operations::Core::AnsibleTowe
       expect(ansible_tower_client).to receive(:update_task)
         .exactly((described_class::POLL_TIMEOUT / described_class::SLEEP_POLL).to_i).times
 
-      ansible_tower_client.wait_for_job_finished(task_id, @job, {})
+      ansible_tower_client.wait_for_provision_complete(task_id, @job, {})
     end
   end
 end

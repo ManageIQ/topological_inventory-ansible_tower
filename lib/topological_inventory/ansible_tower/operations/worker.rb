@@ -42,20 +42,32 @@ module TopologicalInventory
           "platform.topological-inventory.operations-ansible-tower"
         end
 
+        def persist_ref
+          "topological-inventory-operations-ansible-tower"
+        end
+
+        def client_ref
+          "topological-inventory-operations-ansible-tower"
+        end
+
+        def group_ref
+          "topological-inventory-operations-ansible-tower"
+        end
+
         def queue_opts
           {
             :auto_ack    => false,
             :max_bytes   => 50_000,
             :service     => queue_name,
-            :persist_ref => "topological-inventory-operations-ansible-tower"
+            :persist_ref => persist_ref
           }
         end
 
         def default_messaging_opts
           {
             :protocol   => :Kafka,
-            :client_ref => "topological-inventory-operations-ansible-tower",
-            :group_ref  => "topological-inventory-operations-ansible-tower"
+            :client_ref => client_ref,
+            :group_ref  => group_ref
           }
         end
       end

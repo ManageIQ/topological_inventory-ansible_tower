@@ -1,22 +1,15 @@
-require "topological_inventory-api-client"
+require "topological_inventory/providers/common/operations/service_offering"
 require "topological_inventory/ansible_tower/operations/core/ansible_tower_client"
-require "topological_inventory/ansible_tower/operations/core/service_order_mixin"
-require "topological_inventory/ansible_tower/operations/core/topology_api_client"
 require "topological_inventory/ansible_tower/operations/applied_inventories/parser"
 
 module TopologicalInventory
   module AnsibleTower
     module Operations
-      class ServiceOffering
+      class ServiceOffering< TopologicalInventory::Providers::Common::Operations::ServiceOffering
         include Logging
-        include Core::TopologyApiClient
-        include Core::ServiceOrderMixin
 
-        attr_accessor :params, :identity
-
-        def initialize(params = {}, identity = nil)
-          @params   = params
-          @identity = identity
+        def endpoint_client(source_id, task_id, identity)
+          Core::AnsibleTowerClient.new(source_id, task_id, identity)
         end
 
         def applied_inventories
