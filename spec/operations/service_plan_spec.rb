@@ -41,8 +41,8 @@ RSpec.describe TopologicalInventory::AnsibleTower::Operations::ServicePlan do
 
       ansible_tower_client = double
       expect(ansible_tower_client).to receive(:order_service)
-        .with(service_offering.extra.dig(:type), service_offering.source_ref, params["order_params"])
-      expect(subject).to receive(:ansible_tower_client)
+        .with(service_offering, service_plan, params["order_params"])
+      expect(subject).to receive(:endpoint_client)
         .with(service_offering.source_id, params["task_id"], identity)
         .and_return(ansible_tower_client)
 

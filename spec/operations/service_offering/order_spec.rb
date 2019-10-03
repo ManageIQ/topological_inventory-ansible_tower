@@ -1,6 +1,5 @@
 require "topological_inventory-api-client"
 require "topological_inventory/ansible_tower/operations/service_offering"
-
 RSpec.describe TopologicalInventory::AnsibleTower::Operations::ServiceOffering do
   context "#order" do
     let(:subject)  { described_class.new(params, identity) }
@@ -34,8 +33,8 @@ RSpec.describe TopologicalInventory::AnsibleTower::Operations::ServiceOffering d
 
       ansible_tower_client = double
       expect(ansible_tower_client).to receive(:order_service)
-        .with(service_offering.extra.dig(:type), service_offering.source_ref, params["order_params"])
-      expect(subject).to receive(:ansible_tower_client)
+        .with(service_offering, nil, params["order_params"])
+      expect(subject).to receive(:endpoint_client)
         .with(service_offering.source_id, params["task_id"], identity)
         .and_return(ansible_tower_client)
 
