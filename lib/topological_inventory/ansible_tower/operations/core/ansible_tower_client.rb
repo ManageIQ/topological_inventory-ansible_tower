@@ -1,12 +1,12 @@
 require "topological_inventory/ansible_tower/logging"
 require "topological_inventory/ansible_tower/connection"
-require "topological_inventory/providers/common/operations/endpoint_client"
+require "topological_inventory/providers/common/operations/endpoint_client/service_order"
 
 module TopologicalInventory
   module AnsibleTower
     module Operations
       module Core
-        class AnsibleTowerClient < TopologicalInventory::Providers::Common::Operations::EndpointClient
+        class AnsibleTowerClient < TopologicalInventory::Providers::Common::Operations::EndpointClient::ServiceOrder
           include Logging
 
           attr_accessor :connection_manager
