@@ -15,7 +15,7 @@ module TopologicalInventory
         #
         class Parser
           include Logging
-          include Core::TopologyApiClient
+          include TopologicalInventory::Providers::Common::Operations::TopologyApiClient
 
           attr_accessor :identity
 
