@@ -11,14 +11,17 @@ module TopologicalInventory::AnsibleTower
     require "topological_inventory/ansible_tower/collector/service_catalog"
     include TopologicalInventory::AnsibleTower::Collector::ServiceCatalog
 
-    def initialize(source, tower_hostname, tower_user, tower_passwd, metrics, poll_time = 60)
+    def initialize(source, tower_hostname, tower_user, tower_passwd, metrics,
+                   poll_time: 60, proxy_hostname:, receptor_node_id:)
       super(source, :poll_time => poll_time)
 
       self.connection_manager = TopologicalInventory::AnsibleTower::Connection.new
+      self.metrics = metrics
+      self.proxy_hostname = proxy_hostname
+      self.receptor_node_id = receptor_node_id
       self.tower_hostname = tower_hostname
       self.tower_user = tower_user
       self.tower_passwd = tower_passwd
-      self.metrics = metrics
     end
 
     def collect!
@@ -35,7 +38,7 @@ module TopologicalInventory::AnsibleTower
     private
 
     attr_accessor :connection_manager, :tower_hostname, :tower_user, :tower_passwd,
-                  :metrics
+                  :metrics, :proxy_hostname, :receptor_node_id
 
     def endpoint_types
       %w[service_catalog]
@@ -47,7 +50,9 @@ module TopologicalInventory::AnsibleTower
 
     # Connection to endpoint (for each entity type the same)
     def connection_for_entity_type(_entity_type)
-      connection_manager.connect(tower_hostname, tower_user, tower_passwd)
+      connection_manager.connect(tower_hostname, tower_user, tower_passwd,
+                                 :proxy_hostname => proxy_hostname,
+                                 :receptor_node_id => receptor_node_id)
     end
 
     # Thread's main for collecting one entity type's data

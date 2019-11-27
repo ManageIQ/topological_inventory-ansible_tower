@@ -5,14 +5,24 @@ module TopologicalInventory::AnsibleTower
   class Connection
     include Logging
 
-    def connect(base_url, username, password, verify_ssl: ::OpenSSL::SSL::VERIFY_NONE)
+    def connect(base_url, username, password,
+                proxy_hostname:, receptor_node_id:,
+                verify_ssl: ::OpenSSL::SSL::VERIFY_NONE)
       AnsibleTowerClient.logger = self.logger
-      AnsibleTowerClient::Connection.new(
-        :base_url   => api_url(base_url),
+
+      url = proxy_hostname.present? ? api_url(proxy_hostname) : api_url(base_url)
+
+      connection_opts = {
+        :base_url   => url,
         :username   => username,
         :password   => password,
-        :verify_ssl => verify_ssl
-      )
+        :verify_ssl => verify_ssl,
+        :headers    => {}
+      }
+      connection_opts[:headers]['x-rh-receptor'] = receptor_node_id if receptor_node_id.present?
+      connection_opts[:headers]['x-rh-endpoint'] = CGI.escape(api_url(base_url)) if proxy_hostname.present?
+
+      AnsibleTowerClient::Connection.new(connection_opts)
     end
 
     def api_url(base_url)

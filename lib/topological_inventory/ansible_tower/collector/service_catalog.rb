@@ -62,8 +62,6 @@ module TopologicalInventory::AnsibleTower
         TopologicalInventory::AnsibleTower::Iterator.new(fnc, "Couldn't fetch 'service_instance_nodes' of service catalog.")
       end
 
-      # TODO: It seems that each request are sent twice in ansible_tower_client
-      # But don't know why yet
       def get_service_plan(template)
         template.survey_spec_hash if template.survey_enabled
       end
