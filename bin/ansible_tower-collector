@@ -46,6 +46,10 @@ def parse_args
         :type => :string, :default => ENV["INGRESS_API"] || "http://localhost:9292"
     opt :metrics_port, "Port to expose the metrics endpoint on, 0 to disable metrics",
         :type => :integer, :default => (ENV["METRICS_PORT"] || 9394).to_i
+    opt :receptor_controller_url, "URL to receptor controller for source's tenant",
+        :type => :string, :default => ENV["RECEPTOR_CONTROLLER_URL"]
+    opt :receptor_id, "Name of endpoint's receptor node",
+        :type => :string, :default => ENV["RECEPTOR_ID"]
   end
 end
 
