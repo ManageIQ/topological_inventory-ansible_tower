@@ -1,6 +1,6 @@
 require "topological_inventory/ansible_tower/logging"
 require "topological_inventory/providers/common/collector"
-require "topological_inventory/ansible_tower/connection"
+require "topological_inventory/ansible_tower/connection_manager"
 require "topological_inventory/ansible_tower/parser"
 require "topological_inventory/ansible_tower/iterator"
 
@@ -15,7 +15,7 @@ module TopologicalInventory::AnsibleTower
                    poll_time: 60, standalone_mode: true)
       super(source, :poll_time => poll_time, :standalone_mode => standalone_mode)
 
-      self.connection_manager = TopologicalInventory::AnsibleTower::Connection.new
+      self.connection_manager = TopologicalInventory::AnsibleTower::ConnectionManager.new
       self.tower_hostname     = tower_hostname
       self.tower_user         = tower_user
       self.tower_passwd       = tower_passwd
