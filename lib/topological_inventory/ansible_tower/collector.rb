@@ -11,7 +11,7 @@ module TopologicalInventory::AnsibleTower
     require "topological_inventory/ansible_tower/collector/service_catalog"
     include TopologicalInventory::AnsibleTower::Collector::ServiceCatalog
 
-    def initialize(source, tower_hostname, tower_user, tower_passwd, metrics, poll_time = 60)
+    def initialize(source, tower_hostname, tower_user, tower_passwd, metrics, poll_time: 60, collector_threads: nil)
       super(source, :poll_time => poll_time)
 
       self.connection_manager = TopologicalInventory::AnsibleTower::Connection.new
@@ -25,9 +25,15 @@ module TopologicalInventory::AnsibleTower
       until finished?
         ensure_collector_threads
 
-        collector_threads.each_value do |thread|
-          thread.join
+        until self.collected_entity_types_count >= entity_types.count
+          threads_sync.synchronize do
+            sync.wait(threads_sync)
+            self.collected_entity_types_count += 1
+          end
         end
+
+        self.collected_entity_types_count = 0
+
         sleep(poll_time)
       end
     end
