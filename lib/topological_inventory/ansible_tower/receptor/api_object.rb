@@ -7,6 +7,7 @@ module TopologicalInventory::AnsibleTower
 
       POLL_TIME = 5 # seconds
       RECEPTOR_DIRECTIVE = "receptor_http:execute".freeze
+      RECEPTOR_REQUEST_PATH="proxy".freeze # TODO: For testing purposes
 
       def initialize(api, endpoint)
         self.api = api
@@ -75,7 +76,7 @@ module TopologicalInventory::AnsibleTower
             response_body = parse_response(response)
             # TODO: needs more info
             if (msg_id = response_body[:message_id]).present?
-              Receptor::ResponseWorker.instance.register_msg_id(msg_id, self)
+              api.response_worker.register_msg_id(msg_id, self)
               wait_for_response
             else
               logger.error("Sending #{payload['url']}: Response doesn't contain message ID (#{response.body})")
@@ -141,8 +142,8 @@ module TopologicalInventory::AnsibleTower
       # @option opts [Object] :body HTTP body (JSON/XML)
       # @return [Typhoeus::Request] A Typhoeus Request
       def build_request(opts = {})
-        url = api.receptor_endpoint_url
         # TODO: needs ack from receptor-controller
+        url = File.join(api.receptor_endpoint_url, RECEPTOR_REQUEST_PATH)
         http_method = 'POST'
 
         header_params = @default_headers.merge(opts[:header_params] || {})
