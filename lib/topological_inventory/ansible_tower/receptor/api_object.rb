@@ -5,9 +5,10 @@ module TopologicalInventory::AnsibleTower
 
       include Logging
 
-      POLL_TIME = 5 # seconds
-      RECEPTOR_DIRECTIVE = "receptor_http:execute".freeze
-      RECEPTOR_REQUEST_PATH="proxy".freeze # TODO: For testing purposes
+      POLL_TIME             = 5 # seconds
+      RECEPTOR_DIRECTIVE    = "receptor_http:execute".freeze
+      RECEPTOR_REQUEST_PATH = "proxy".freeze # TODO: For testing purposes
+      DEFAULT_TIMEOUT       = 300.seconds
 
       def initialize(api, endpoint)
         self.api = api
@@ -79,7 +80,7 @@ module TopologicalInventory::AnsibleTower
             # TODO: needs more info
             if (msg_id = response_body[:message_id]).present?
               api.response_worker.register_msg_id(msg_id, self)
-              wait_for_response
+              wait_for_response(msg_id)
             else
               logger.error("Sending #{payload['url']}: Response doesn't contain message ID (#{response.body})")
             end
@@ -103,14 +104,16 @@ module TopologicalInventory::AnsibleTower
         JSON.parse(response.body.to_s.presence || '{}')
       end
 
-      def wait_for_response
+      def wait_for_response(message_id)
         @response_mutex.synchronize do
-          @cv.wait(@response_mutex, nil)
+          @cv.wait(@response_mutex, DEFAULT_TIMEOUT)
 
           if @response_data.present?
             data           = @response_data.dup
             @response_data = nil
             return data
+          else
+            logger.warn("Response timeout for #{message_id}, skipping")
           end
         end
       end
