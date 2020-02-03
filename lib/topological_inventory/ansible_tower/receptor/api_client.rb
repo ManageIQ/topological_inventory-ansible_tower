@@ -8,15 +8,18 @@ module TopologicalInventory::AnsibleTower
     class ApiClient < TopologicalInventory::AnsibleTower::Connection
       include Logging
 
+      attr_accessor :response_worker
+
       def initialize(base_url, username, password,
-                     receptor_id, receptor_base_url,
+                     receptor_id, receptor_base_url, response_worker,
                      verify_ssl: ::OpenSSL::SSL::VERIFY_NONE)
-        self.base_url = base_url
-        self.username = username
-        self.password = password
-        self.verify_ssl = verify_ssl
-        self.receptor_id = receptor_id
-        self.receptor_base_url = receptor_base_url
+        self.base_url                 = base_url
+        self.username                 = username
+        self.password                 = password
+        self.verify_ssl               = verify_ssl
+        self.receptor_id              = receptor_id
+        self.receptor_base_url        = receptor_base_url
+        self.response_worker = response_worker
       end
 
       def api

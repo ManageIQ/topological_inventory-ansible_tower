@@ -1,21 +1,18 @@
 module TopologicalInventory::AnsibleTower
   module Receptor
     class ResponseWorker
-      def self.instance
-        @instance ||= self.new
-      end
+      attr_reader :started
+      alias_method :started?, :started
 
       def initialize
-        @mutex   = Mutex.new
-        @started = false
+        self.started = false
         @registered_messages = {}
       end
 
       def start
-        @mutex.synchronize do
-          return if @started
-          @started = true
-        end
+        return if started
+
+        self.started = true
         Thread.new { listen }
       end
 
@@ -24,6 +21,8 @@ module TopologicalInventory::AnsibleTower
       end
 
       private
+
+      attr_writer :started
 
       def listen
         # Open a connection to the messaging service
