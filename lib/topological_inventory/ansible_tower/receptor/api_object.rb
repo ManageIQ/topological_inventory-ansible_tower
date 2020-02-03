@@ -13,6 +13,7 @@ module TopologicalInventory::AnsibleTower
         self.api = api
         self.endpoint = endpoint
         @response_mutex = Mutex.new
+        @cv = ConditionVariable.new
         @response_data = nil
 
         @default_headers = {}
@@ -45,6 +46,7 @@ module TopologicalInventory::AnsibleTower
       def response_received(message_id, data)
         @response_mutex.synchronize do
           @response_data = data
+          @cv.signal
         end
       end
 
@@ -102,15 +104,14 @@ module TopologicalInventory::AnsibleTower
       end
 
       def wait_for_response
-        loop do
-          @response_mutex.synchronize do
-            if @response_data.present?
-              data = @response_data
-              @response_data = nil
-              return data
-            end
+        @response_mutex.synchronize do
+          @cv.wait(@response_mutex, nil)
+
+          if @response_data.present?
+            data           = @response_data.dup
+            @response_data = nil
+            return data
           end
-          sleep(POLL_TIME)
         end
       end
 
@@ -152,24 +153,11 @@ module TopologicalInventory::AnsibleTower
 
         #update_params_for_auth! header_params, query_params, opts[:auth_names]
 
-        # set ssl_verifyhosts option based on @config.verify_ssl_host (true/false)
-        #_verify_ssl_host = @config.verify_ssl_host ? 2 : 0
-
         req_opts = {
           :method => http_method,
           :headers => header_params,
           :params => query_params,
-          #:params_encoding => @config.params_encoding,
-          #:timeout => @config.timeout,
-          #:ssl_verifypeer => api.verify_ssl,
-          #:ssl_verifyhost => _verify_ssl_host,
-          #:sslcert => @config.cert_file,
-          #:sslkey => @config.key_file,
-          #:verbose => @config.debugging
         }
-
-        # set custom cert, if provided
-        #req_opts[:cainfo] = @config.ssl_ca_cert if @config.ssl_ca_cert
 
         if [:post, :patch, :put, :delete].include?(http_method)
           req_body = build_request_body(header_params, form_params, opts[:body])
