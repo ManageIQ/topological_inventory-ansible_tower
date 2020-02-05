@@ -6,8 +6,10 @@ module TopologicalInventory::AnsibleTower
   class CollectorsPool < TopologicalInventory::Providers::Common::CollectorsPool
     include Logging
 
-    def initialize(config_name, metrics)
-      super
+    def initialize(config_name, metrics, queue_host: nil, queue_port: nil)
+      super(config_name, metrics)
+      self.queue_host = queue_host
+      self.queue_port = queue_port
     end
 
     def path_to_config
@@ -32,7 +34,18 @@ module TopologicalInventory::AnsibleTower
       url = URI::Generic.build(:scheme => source.scheme.to_s.strip.presence || 'https',
                                :host   => source.host.to_s.strip,
                                :port   => source.port.to_s.strip)
-      TopologicalInventory::AnsibleTower::Collector.new(source.source, url.to_s, secret["username"], secret["password"], metrics, :standalone_mode => false)
+      TopologicalInventory::AnsibleTower::Collector.new(source.source,
+                                                        url.to_s,
+                                                        secret["username"],
+                                                        secret["password"],
+                                                        metrics,
+                                                        :standalone_mode => false,
+                                                        :queue_host      => queue_host,
+                                                        :queue_port      => queue_port)
     end
+
+    private
+
+    attr_accessor :queue_host, :queue_port
   end
 end
