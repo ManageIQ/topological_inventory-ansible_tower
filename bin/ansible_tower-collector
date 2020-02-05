@@ -50,9 +50,15 @@ def parse_args
     opt :metrics_port, "Port to expose the metrics endpoint on, 0 to disable metrics",
         :type => :integer, :default => (ENV["METRICS_PORT"] || 9394).to_i
     opt :receptor_controller_url, "URL to receptor controller for source's tenant",
-        :type => :string, :default => ENV["RECEPTOR_CONTROLLER_URL"]
+        :type => :string, :default => ENV["RECEPTOR_CONTROLLER_URL"] || "http://localhost:9090"
     opt :receptor_id, "Name of endpoint's receptor node",
-        :type => :string, :default => ENV["RECEPTOR_ID"]
+        :type => :string, :default => ENV["RECEPTOR_ID"] || "node-a"
+    opt :tenant, "Account number for receptor controller's x-rh-identity header",
+        :type => :string, :default => ENV['RECEPTOR_ACCOUNT'] || "0000001"
+    opt :queue_host, "Kafka messaging: hostname or IP",
+        :type => :string, :default => ENV["QUEUE_HOST"] || "localhost"
+    opt :queue_port, "Kafka messaging: port",
+        :type => :string, :default => ENV["QUEUE_PORT"] || 9092
   end
 end
 
@@ -80,10 +86,18 @@ TopologicalInventoryIngressApiClient.configure.host   = "#{ingress_api_uri.host}
 begin
   metrics = TopologicalInventory::AnsibleTower::Collector::ApplicationMetrics.new(args[:metrics_port])
   if args[:config].nil?
-    collector = TopologicalInventory::AnsibleTower::Collector.new(args[:source], "#{args[:scheme]}://#{args[:host]}:#{args[:port]}", args[:user], args[:password], metrics)
+    collector = TopologicalInventory::AnsibleTower::Collector.new(args[:source],
+                                                                  "#{args[:scheme]}://#{args[:host]}:#{args[:port]}", args[:user],
+                                                                  args[:password],
+                                                                  metrics,
+                                                                  :receptor_id       => args[:receptor_id],
+                                                                  :receptor_base_url => args[:receptor_controller_url],
+                                                                  :tenant            => args[:tenant],
+                                                                  :queue_host        => args[:queue_host],
+                                                                  :queue_port        => args[:queue_port])
     collector.collect!
   else
-    pool = TopologicalInventory::AnsibleTower::CollectorsPool.new(args[:config], metrics)
+    pool = TopologicalInventory::AnsibleTower::CollectorsPool.new(args[:config], metrics, :queue_host => args[:queue_host], :queue_port => args[:queue_port])
     pool.run!
   end
 ensure

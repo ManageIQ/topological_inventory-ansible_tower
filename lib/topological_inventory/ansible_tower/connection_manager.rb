@@ -8,11 +8,10 @@ module TopologicalInventory::AnsibleTower
 
     def connect(base_url, username, password,
                 verify_ssl: ::OpenSSL::SSL::VERIFY_NONE,
-                receptor_id: nil, receptor_base_url: nil)
-      if receptor_id && receptor_base_url
-        client = receptor_api_client(base_url, username, password, receptor_id, receptor_base_url, :verify_ssl => verify_ssl)
-        client.start
-        client
+                queue_host: nil, queue_port: nil,
+                receptor_id: nil, receptor_base_url: nil, account_number: nil)
+      if receptor_id && receptor_base_url && account_number
+        receptor_api_client(base_url, username, password, receptor_id, receptor_base_url, account_number, queue_host, queue_port, :verify_ssl => verify_ssl)
       else
         ansible_tower_api_client(base_url, username, password, :verify_ssl => verify_ssl)
       end
@@ -20,18 +19,19 @@ module TopologicalInventory::AnsibleTower
 
     private
 
-    def receptor_response_worker
+    def receptor_response_worker(queue_host, queue_port)
       @@sync.synchronize do
-        @@receptor_response_worker ||= TopologicalInventory::AnsibleTower::Receptor::ResponseWorker.new
+        @@receptor_response_worker ||= TopologicalInventory::AnsibleTower::Receptor::ResponseWorker.new(queue_host, queue_port)
         @@receptor_response_worker.start unless @@receptor_response_worker.started?
       end
       @@receptor_response_worker
     end
 
-    def receptor_api_client(base_url, username, password, receptor_id, receptor_base_url, verify_ssl:)
+    def receptor_api_client(base_url, username, password, receptor_id, receptor_base_url, account_number, queue_host, queue_port, verify_ssl:)
+      account_number = '0000001' # TODO: for now!
       TopologicalInventory::AnsibleTower::Receptor::ApiClient.new(
-        base_url, username, password, receptor_id, receptor_base_url,
-      @@receptor_response_worker,
+        base_url, username, password, receptor_id, receptor_base_url, account_number,
+        receptor_response_worker(queue_host, queue_port),
         :verify_ssl => verify_ssl,
         )
     end
