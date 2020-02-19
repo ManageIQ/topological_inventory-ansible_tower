@@ -57,6 +57,14 @@ module TopologicalInventory::AnsibleTower
         Receptor::ApiObject.new(api, 'config')
       end
 
+      def credentials
+        Receptor::ApiObject.new(api, 'credentials')
+      end
+
+      def credential_types
+        Receptor::ApiObject.new(api, 'credential_types')
+      end
+
       def job_templates
         Receptor::Template.new(api, 'job_templates')
       end

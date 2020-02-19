@@ -28,7 +28,7 @@ module TopologicalInventory::AnsibleTower
     end
 
     def receptor_api_client(base_url, username, password, receptor_id, receptor_base_url, account_number, queue_host, queue_port, verify_ssl:)
-      account_number = '0000001' # TODO: for now!
+      # account_number = '0000001' # TODO: for now!
       TopologicalInventory::AnsibleTower::Receptor::ApiClient.new(
         base_url, username, password, receptor_id, receptor_base_url, account_number,
         receptor_response_worker(queue_host, queue_port),
