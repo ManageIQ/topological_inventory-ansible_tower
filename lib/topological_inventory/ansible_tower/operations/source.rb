@@ -12,7 +12,7 @@ module TopologicalInventory
 
         attr_accessor :params, :context, :source_id
 
-        def initialize(params = {}, request_context = nil)
+        def initialize(params = {}, request_context = nil, receptor_client = nil)
           @params  = params
           @context = request_context
           @source_id = nil

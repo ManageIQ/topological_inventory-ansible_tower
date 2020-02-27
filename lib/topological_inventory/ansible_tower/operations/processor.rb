@@ -11,23 +11,23 @@ module TopologicalInventory
         include Logging
         include Core::TopologyApiClient
 
-        def self.process!(message)
-          model, method = message.message.to_s.split(".")
-          new(model, method, message.payload).process
+        def self.process!(message, receptor_client)
+          new(message, receptor_client).process
         end
 
-        # @param payload [Hash] https://github.com/ManageIQ/topological_inventory-api/blob/master/app/controllers/api/v0/service_plans_controller.rb#L32-L41
-        def initialize(model, method, payload)
-          self.model    = model
-          self.method   = method
+        def initialize(message, receptor_client)
+          self.message = message
+          self.model, self.method = message.message.to_s.split(".")
+
           self.params   = payload["params"]
           self.identity = payload["request_context"]
+          self.receptor_client = receptor_client
         end
 
         def process
           logger.info(status_log_msg)
 
-          impl = "#{Operations}::#{model}".safe_constantize&.new(params, identity)
+          impl = "#{Operations}::#{model}".safe_constantize&.new(params, identity, receptor_client)
           if impl&.respond_to?(method)
             result = impl&.send(method)
 
@@ -46,7 +46,7 @@ module TopologicalInventory
 
         private
 
-        attr_accessor :identity, :model, :method, :params
+        attr_accessor :message, :identity, :model, :method, :params,  :receptor_client
 
         def status_log_msg(status = nil)
           "Processing #{model}##{method} [#{params}]...#{status}"

@@ -11,6 +11,10 @@ def parse_args
     opt :queue_host, "Kafka messaging: hostname or IP", :type => :string, :default => ENV["QUEUE_HOST"] || "localhost"
     opt :queue_port, "Kafka messaging: port", :type => :integer, :default => (ENV["QUEUE_PORT"] || 9092).to_i
 
+    opt :receptor_controller_scheme, "Receptor Controller scheme", :type => :string, :default => ENV["RECEPTOR_CONTROLLER_SCHEME"] || "http"
+    opt :receptor_controller_host, "Receptor Controller host", :type => :string, :default => ENV["RECEPTOR_CONTROLLER_HOST"]
+    opt :receptor_controller_port, "Receptor Controller port", :type => :integer, :default => ENV["RECEPTOR_CONTROLLER_PORT"].to_i
+
     opt :sources_scheme, "Sources API scheme", :type => :string, :default => ENV["SOURCES_SCHEME"] || "http"
     opt :sources_host, "Sources API host name", :type => :string, :default => ENV["SOURCES_HOST"]
     opt :sources_port, "Sources API port", :type => :integer, :default => ENV["SOURCES_PORT"].to_i
@@ -22,9 +26,7 @@ def parse_args
 end
 
 def check_args(args)
-  %i[queue_host queue_port
-     sources_scheme sources_host sources_port
-     topological_scheme topological_host topological_port].each do |arg|
+  (args.keys - %i[help]).each do |arg|
     Optimist.die arg, "can't be blank" if args[arg].blank?
     Optimist.die arg, "can't be zero" if arg.to_s.index('port').present? && args[arg].zero?
   end
@@ -42,6 +44,15 @@ end
 SourcesApiClient.configure do |config|
   config.scheme = args[:sources_scheme] || "http"
   config.host   = "#{args[:sources_host]}:#{args[:sources_port]}"
+end
+
+ReceptorController::Client.configure do |config|
+  config.controller_scheme          = args[:receptor_controller_scheme]
+  config.controller_host            = "#{args[:receptor_controller_host]}:#{args[:receptor_controller_port]}"
+  config.queue_host                 = args[:queue_host]
+  config.queue_port                 = args[:queue_port]
+  config.response_timeout           = 10.seconds # TODO: too fast?
+  config.response_timeout_poll_time = 1.second   # TODO: too fast?
 end
 
 begin
