@@ -12,8 +12,7 @@ module TopologicalInventory::AnsibleTower
     include TopologicalInventory::AnsibleTower::Collector::ServiceCatalog
 
     def initialize(source, tower_hostname, tower_user, tower_passwd, metrics,
-                   receptor_id: nil, receptor_base_url: nil, tenant: nil,
-                   queue_host: nil, queue_port: nil,
+                   receptor_node: nil, external_tenant: nil,
                    poll_time: 60, standalone_mode: true)
       super(source, :poll_time => poll_time, :standalone_mode => standalone_mode)
 
@@ -22,11 +21,8 @@ module TopologicalInventory::AnsibleTower
       self.tower_user         = tower_user
       self.tower_passwd       = tower_passwd
       self.metrics            = metrics
-      self.queue_host         = queue_host
-      self.queue_port         = queue_port
-      self.receptor_id        = receptor_id
-      self.receptor_base_url  = receptor_base_url
-      self.tenant             = tenant # eq Tenant.external_tenant or account_number in x-rh-identity
+      self.receptor_node      = receptor_node
+      self.tenant             = external_tenant # eq Tenant.external_tenant or account_number in x-rh-identity
     end
 
     def collect!
@@ -44,7 +40,7 @@ module TopologicalInventory::AnsibleTower
     private
 
     attr_accessor :connection_manager, :tower_hostname, :tower_user, :tower_passwd,
-                  :metrics, :queue_host, :queue_port, :receptor_id, :receptor_base_url, :tenant
+                  :metrics, :receptor_node, :tenant
 
     def endpoint_types
       %w[service_catalog]
@@ -63,10 +59,7 @@ module TopologicalInventory::AnsibleTower
     # Connection to endpoint (for each entity type the same)
     def connection_for_entity_type(_entity_type)
       connection_manager.connect(tower_hostname, tower_user, tower_passwd,
-                                 :queue_host        => queue_host,
-                                 :queue_port        => queue_port,
-                                 :receptor_id       => receptor_id,
-                                 :receptor_base_url => receptor_base_url,
+                                 :receptor_node     => receptor_node,
                                  :account_number    => tenant)
     end
 

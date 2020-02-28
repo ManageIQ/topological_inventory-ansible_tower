@@ -46,12 +46,13 @@ def parse_args
         :type => :string, :default => ENV["INGRESS_API"] || "http://localhost:9292"
     opt :metrics_port, "Port to expose the metrics endpoint on, 0 to disable metrics",
         :type => :integer, :default => (ENV["METRICS_PORT"] || 9394).to_i
-    opt :receptor_controller_url, "URL to receptor controller for source's tenant",
-        :type => :string, :default => ENV["RECEPTOR_CONTROLLER_URL"] || "http://localhost:9090"
-    opt :receptor_id, "Name of endpoint's receptor node",
-        :type => :string, :default => ENV["RECEPTOR_ID"] || "node-a"
-    opt :tenant, "Account number for receptor controller's x-rh-identity header",
-        :type => :string, :default => ENV['RECEPTOR_ACCOUNT'] || "0000001"
+    opt :receptor_controller_scheme, "Receptor Controller scheme", :type => :string, :default => ENV["RECEPTOR_CONTROLLER_SCHEME"] || "http"
+    opt :receptor_controller_host, "Receptor Controller host", :type => :string, :default => ENV["RECEPTOR_CONTROLLER_HOST"] || "localhost"
+    opt :receptor_controller_port, "Receptor Controller port", :type => :integer, :default => (ENV["RECEPTOR_CONTROLLER_PORT"] || 9090).to_i
+    opt :receptor_node, "Name of endpoint's receptor node",
+        :type => :string, :default => ENV["RECEPTOR_NODE"]
+    opt :external_tenant, "Account number for receptor controller's x-rh-identity header",
+        :type => :string, :default => ENV["ACCOUNT_NUMBER"]
     opt :queue_host, "Kafka messaging: hostname or IP",
         :type => :string, :default => ENV["QUEUE_HOST"] || "localhost"
     opt :queue_port, "Kafka messaging: port",
@@ -80,6 +81,13 @@ ingress_api_uri = URI(args[:ingress_api])
 TopologicalInventoryIngressApiClient.configure.scheme = ingress_api_uri.scheme || "http"
 TopologicalInventoryIngressApiClient.configure.host   = "#{ingress_api_uri.host}:#{ingress_api_uri.port}"
 
+ReceptorController::Client.configure do |config|
+  config.controller_scheme = args[:receptor_controller_scheme]
+  config.controller_host   = "#{args[:receptor_controller_host]}:#{args[:receptor_controller_port]}"
+  config.queue_host        = args[:queue_host]
+  config.queue_port        = args[:queue_port]
+end
+
 begin
   metrics = TopologicalInventory::AnsibleTower::Collector::ApplicationMetrics.new(args[:metrics_port])
   if args[:config].nil?
@@ -87,11 +95,8 @@ begin
                                                                   "#{args[:scheme]}://#{args[:host]}", args[:user],
                                                                   args[:password],
                                                                   metrics,
-                                                                  :receptor_id       => args[:receptor_id],
-                                                                  :receptor_base_url => args[:receptor_controller_url],
-                                                                  :tenant            => args[:tenant],
-                                                                  :queue_host        => args[:queue_host],
-                                                                  :queue_port        => args[:queue_port])
+                                                                  :receptor_node     => args[:receptor_node],
+                                                                  :external_tenant   => args[:external_tenant])
     collector.collect!
   else
     pool = TopologicalInventory::AnsibleTower::CollectorsPool.new(args[:config], metrics, :queue_host => args[:queue_host], :queue_port => args[:queue_port])
