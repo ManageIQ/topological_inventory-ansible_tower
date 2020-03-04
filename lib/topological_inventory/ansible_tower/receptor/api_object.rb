@@ -27,11 +27,15 @@ module TopologicalInventory::AnsibleTower
         build_object(parse_kafka_response(response))
       end
 
-      # @param opts [Hash] :page_size
       def all(opts = nil)
+        find_all_by_url(endpoint, opts)
+      end
+
+      # @param opts [Hash] :page_size
+      def find_all_by_url(url, opts = nil)
         Enumerator.new do |yielder|
           @collection   = []
-          next_page_url = endpoint
+          next_page_url = url
           options       = opts
 
           loop do
