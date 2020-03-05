@@ -13,7 +13,7 @@ module TopologicalInventory
 
         attr_accessor :params, :identity
 
-        def initialize(params = {}, identity = nil)
+        def initialize(params = {}, identity = nil, receptor_client = nil)
           @params   = params
           @identity = identity
         end
