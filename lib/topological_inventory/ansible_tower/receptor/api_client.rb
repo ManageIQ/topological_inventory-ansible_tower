@@ -19,7 +19,7 @@ module TopologicalInventory::AnsibleTower
       def initialize(base_url, username, password, receptor_client,
                      receptor_node, account_number,
                      verify_ssl: ::OpenSSL::SSL::VERIFY_NONE)
-        self.base_url          = base_url
+        self.base_url          = api_url(base_url)
         self.username          = username
         self.password          = password
         self.verify_ssl        = verify_ssl
@@ -50,6 +50,10 @@ module TopologicalInventory::AnsibleTower
 
       def get(path)
         Receptor::ApiObject.new(api, path).get
+      end
+
+      def post(path, post_data)
+        Receptor::ApiObject.new(api, path).post(post_data)
       end
 
       def config
@@ -90,6 +94,14 @@ module TopologicalInventory::AnsibleTower
 
       def inventories
         Receptor::ApiObject.new(api, 'inventories')
+      end
+
+      # TODO: test it with surveys collecting
+      def api_url(base_url)
+        base_url = "https://#{base_url}" unless base_url =~ %r{\Ahttps?:\/\/} # HACK: URI can't properly parse a URL with no scheme
+        uri      = URI(base_url)
+        uri.path = default_api_path if uri.path.blank?
+        uri.to_s
       end
 
       def default_api_path

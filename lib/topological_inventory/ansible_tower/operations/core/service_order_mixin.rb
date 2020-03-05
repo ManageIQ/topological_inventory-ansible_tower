@@ -3,6 +3,9 @@ module TopologicalInventory
     module Operations
       module Core
         module ServiceOrderMixin
+          SLEEP_POLL = 10
+          POLL_TIMEOUT = 1800
+
           # Service Offerings (Job Templates) are launched in AnsibleTower
           # and Task updated to "running" state.
           # Update "running" => "complete" happens in persister

@@ -20,6 +20,11 @@ module TopologicalInventory::AnsibleTower
         raw_kafka_response(response)
       end
 
+      def post(data)
+        response = send_request(:post, endpoint, :data => data)
+        raw_kafka_response(response)
+      end
+
       def find(id)
         path = File.join(endpoint, id.to_s, '/')
 
@@ -62,21 +67,24 @@ module TopologicalInventory::AnsibleTower
 
       attr_accessor :type
 
-      def build_payload(http_method, path, params = nil)
+      def build_payload(http_method, path, query_params: nil, data: nil)
         self.uri = URI(api.base_url.to_s) + path.to_s
-        uri.query = params.to_query if params
+        uri.query = query_params.to_query if query_params
         headers = { 'Authorization' => "Basic #{Base64.strict_encode64("#{api.username}:#{api.password}")}"}
         verify_ssl = api.verify_ssl != OpenSSL::SSL::VERIFY_NONE #? false : true
-        {
+        payload = {
           'method'  => http_method,
           'url'     => uri,
           'headers' => headers,
           'ssl'     => verify_ssl
         }
+        payload['data'] = data if data.present?
+
+        payload
       end
 
-      def send_request(http_method, path, params = nil)
-        payload = build_payload(http_method, path, params)
+      def send_request(http_method, path, query_params: nil, data: nil)
+        payload = build_payload(http_method, path, :query_params => query_params, :data => data)
 
         directive = receptor_client.directive(api.account_number,
                                               api.receptor_node,
@@ -96,7 +104,7 @@ module TopologicalInventory::AnsibleTower
       def fetch_more_results(next_page_url, params)
         return if next_page_url.nil?
 
-        response = send_request(:get, next_page_url, params)
+        response = send_request(:get, next_page_url, :query_params => params)
 
         body = parse_kafka_response(response)
         parse_result_set(body)

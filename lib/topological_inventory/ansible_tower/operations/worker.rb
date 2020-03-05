@@ -1,4 +1,5 @@
 require "manageiq-messaging"
+require "receptor_controller-client"
 require "topological_inventory/ansible_tower/logging"
 require "topological_inventory/ansible_tower/operations/processor"
 require "topological_inventory/ansible_tower/operations/source"
@@ -6,6 +7,8 @@ require "topological_inventory/ansible_tower/operations/source"
 module TopologicalInventory
   module AnsibleTower
     module Operations
+      class IdentityError < StandardError; end
+
       class Worker
         include Logging
 
@@ -14,6 +17,10 @@ module TopologicalInventory
         end
 
         def run
+          receptor_client = ReceptorController::Client.new(:logger => logger)
+          TopologicalInventory::AnsibleTower::ConnectionManager.class_variable_set(:@@receptor_client, receptor_client)
+          receptor_client.start
+
           # Open a connection to the messaging service
           client = ManageIQ::Messaging::Client.open(messaging_client_opts)
 
@@ -29,14 +36,15 @@ module TopologicalInventory
           logger.error("#{err.cause}\n#{err.backtrace.join("\n")}")
         ensure
           client&.close
+          receptor_client&.stop
         end
 
         private
 
         attr_accessor :messaging_client_opts
 
-        def process_message(message)
-          Processor.process!(message)
+        def process_message(message, receptor_client)
+          Processor.process!(message, receptor_client)
         rescue StandardError => err
           model, method = message.message.to_s.split(".")
           task_id = message.payload&.fetch_path('params','task_id')
