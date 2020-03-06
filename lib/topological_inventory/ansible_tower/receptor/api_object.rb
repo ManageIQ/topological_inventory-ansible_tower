@@ -80,9 +80,10 @@ module TopologicalInventory::AnsibleTower
 
         directive = receptor_client.directive(api.account_number,
                                               api.receptor_node,
-                                              :directive => RECEPTOR_DIRECTIVE,
-                                              :payload   => payload.to_json,
-                                              :type      => :blocking)
+                                              :directive          => RECEPTOR_DIRECTIVE,
+                                              :log_message_common => payload['url'],
+                                              :payload            => payload.to_json,
+                                              :type               => :blocking)
         directive.call
       end
 
