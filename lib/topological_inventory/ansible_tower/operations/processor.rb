@@ -17,7 +17,7 @@ module TopologicalInventory
         end
 
         # @param payload [Hash] https://github.com/ManageIQ/topological_inventory-api/blob/master/app/controllers/api/v0/service_plans_controller.rb#L32-L41
-        def initialize(model, method, payload, receptor_client)
+        def initialize(model, method, payload, receptor_client = nil)
           self.model    = model
           self.method   = method
           self.params   = payload["params"]

@@ -11,9 +11,19 @@ module TopologicalInventory
         private
 
         def connection_check
-          connection = ::TopologicalInventory::AnsibleTower::Connection.new
-          connection = connection.connect(full_hostname(endpoint), authentication.username, authentication.password)
-          connection.api.version
+          if endpoint.receptor_node.present?
+            # TODO: this will change when using the new plugin.
+            connection = connection_manager.connect(full_hostname(endpoint), authentication.username, authentication.password,
+                                       :receptor_node => endpoint.receptor_node,
+                                       #:account_number => "1460290",
+                                       :account_number => "0000001",
+                                       :verify_ssl => 0)
+
+            connection.get("/api/v2/ping/")
+          else
+            connection = connection_manager.connect(full_hostname(endpoint), authentication.username, authentication.password)
+            connection.api.version
+          end
 
           [STATUS_AVAILABLE, nil]
         rescue => e
@@ -23,6 +33,10 @@ module TopologicalInventory
 
         def full_hostname(endpoint)
           endpoint.host.tap { |host| host << ":#{endpoint.port}" if endpoint.port }
+        end
+
+        def connection_manager
+          @connection_manager ||= TopologicalInventory::AnsibleTower::ConnectionManager.new
         end
       end
     end

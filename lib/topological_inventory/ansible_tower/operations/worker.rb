@@ -29,7 +29,7 @@ module TopologicalInventory
             log_with(message.payload&.fetch_path('request_context','x-rh-insights-request-id')) do
               model, method = message.message.to_s.split(".")
               logger.info("Received message #{model}##{method}, #{message.payload}")
-              process_message(message)
+              process_message(message, receptor_client)
             end
           end
         rescue => err
