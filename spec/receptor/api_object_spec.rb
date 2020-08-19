@@ -105,7 +105,7 @@ RSpec.describe TopologicalInventory::AnsibleTower::Receptor::ApiObject do
                                      .and_return(api_object))
 
         expect(api_object).to(receive(:send_request)
-                                .with(:post, job_order_path, :data => post_data)
+                                .with(:post, job_order_path, post_data)
                                 .and_return('status' => 200, 'body' => body))
 
         response = api.post(job_order_path, post_data)
@@ -192,7 +192,7 @@ RSpec.describe TopologicalInventory::AnsibleTower::Receptor::ApiObject do
 
         payload = {
           'method'          => 'GET',
-          'href_slug'       => '/api/v2/job_templates?id__in=42%2C1',
+          'href_slug'       => '/api/v2/job_templates',
           'params'          => query_params,
           'fetch_all_pages' => true,
           'accept_encoding' => 'gzip'
@@ -202,7 +202,7 @@ RSpec.describe TopologicalInventory::AnsibleTower::Receptor::ApiObject do
                                      .with(account_number,
                                            receptor_node_id,
                                            :directive          => described_class::RECEPTOR_DIRECTIVE,
-                                           :log_message_common => '/api/v2/job_templates?id__in=42%2C1',
+                                           :log_message_common => '/api/v2/job_templates',
                                            :payload            => payload.to_json,
                                            :type               => :non_blocking)
                                      .and_return(directive))

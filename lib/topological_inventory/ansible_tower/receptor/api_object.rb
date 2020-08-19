@@ -29,7 +29,7 @@ module TopologicalInventory::AnsibleTower
       end
 
       def post(data)
-        response = send_request(:post, endpoint, :data => data)
+        response = send_request(:post, endpoint, data)
         raw_kafka_response(response)
       end
 
@@ -82,7 +82,6 @@ module TopologicalInventory::AnsibleTower
 
       def build_payload(http_method, path, params = nil, receptor_opts = {})
         slug = path.to_s
-        slug += "?#{params.to_query}" if params
         payload = {
           'method'          => http_method.to_s.upcase,
           'href_slug'       => slug,
