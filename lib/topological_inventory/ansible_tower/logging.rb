@@ -7,7 +7,8 @@ module TopologicalInventory
     end
 
     def self.logger
-      @logger ||= TopologicalInventory::Providers::Common::Logger.new
+      # Set the log level to whatever we specify in the environment if it is present, defaulting to DEBUG
+      @logger ||= TopologicalInventory::Providers::Common::Logger.new.tap { |log| log.level = ENV['LOG_LEVEL'] if ENV['LOG_LEVEL'] }
     end
 
     module Logging

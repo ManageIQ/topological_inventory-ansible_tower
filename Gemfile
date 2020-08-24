@@ -7,7 +7,7 @@ gem "activesupport", '~> 5.2.4.3'
 gem "ansible_tower_client", "~> 0.21.0"
 gem "cloudwatchlogger",   "~> 0.2"
 gem "concurrent-ruby"
-gem "manageiq-loggers",   "~> 0.5.0"
+gem "manageiq-loggers",   "~> 0.5.1"
 gem "manageiq-messaging", "~> 0.1.2"
 gem "more_core_extensions"
 gem "optimist"
