@@ -44,7 +44,6 @@ module TopologicalInventory
       def service_catalog_entity_types
         %w[service_inventories
            service_offerings
-           service_instances
            service_offering_nodes
            service_credentials
            service_credential_types]

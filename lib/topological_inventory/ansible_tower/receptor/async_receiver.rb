@@ -13,14 +13,14 @@ module TopologicalInventory::AnsibleTower
       attr_accessor :transformation
       attr_reader :connection, :entity_type, :refresh_state_uuid, :refresh_state_started_at, :sweeping_enabled, :sweep_scope, :total_parts
 
-      def initialize(collector, connection, entity_type, refresh_state_uuid, refresh_state_started_at)
+      def initialize(collector, connection, entity_type, refresh_state_uuid, refresh_state_started_at, sweeping_enabled: true)
         self.async_requests_remaining = Concurrent::AtomicFixnum.new
         self.collector = collector
         self.connection = connection
         self.entity_type = entity_type
         self.refresh_state_uuid = refresh_state_uuid
         self.refresh_state_started_at = refresh_state_started_at
-        self.sweeping_enabled = Concurrent::AtomicBoolean.new(true)
+        self.sweeping_enabled = Concurrent::AtomicBoolean.new(sweeping_enabled)
         self.sweep_scope = Concurrent::Set.new
         self.total_parts = Concurrent::AtomicFixnum.new
         self.transformation = nil
@@ -73,6 +73,9 @@ module TopologicalInventory::AnsibleTower
 
         if async_requests_remaining.value == 0
           collector.async_collecting_finished(entity_type, refresh_state_uuid, total_parts.value)
+
+          # Sweeping is disabled for targeted_refresh and operations
+          # and in case of errors
           if sweeping_enabled.value
             collector.async_sweep_inventory(refresh_state_uuid, sweep_scope.to_a, total_parts.value, refresh_state_started_at)
           end

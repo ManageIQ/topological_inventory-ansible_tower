@@ -60,9 +60,9 @@ module TopologicalInventory::AnsibleTower
         end
       end
 
-      def get_service_instance_nodes(connection, query_params, on_premise: false, receptor_receiver: nil, receptor_params: {})
+      def get_service_instance_nodes(connection, query_params, workflow: nil, on_premise: false, receptor_receiver: nil, receptor_params: {})
         tower_types = %i[workflow_job_nodes]
-        get_tower_objects(connection, query_params, tower_types, :on_premise => on_premise, :receptor_receiver => receptor_receiver, :receptor_params => receptor_params) do
+        get_tower_objects(connection, query_params, tower_types, :slug => workflow&.related&.workflow_nodes, :on_premise => on_premise, :receptor_receiver => receptor_receiver, :receptor_params => receptor_params) do
           # transformation of Workflow Job Node to parser-compatible hash
           # + subqueries for node's credentials
           lambda do |service_instance_node|
@@ -85,14 +85,15 @@ module TopologicalInventory::AnsibleTower
       # @param connection [AnsibleTowerClient::Connection | TopologicalInventory::AnsibleTower::Receptor::ApiClient]
       # @param query_params [Hash] API query params
       # @param tower_types [Array<Symbol>] i.e. %i[job_templates workflow_job_templates]
+      # @param slug [String] optional, slug for calling "find_all_by_url" instead of "all"
       # @param on_premise [Boolean] Ansible Tower placement (in public/on premise)
       # @param receptor_receiver [TopologicalInventory::AnsibleTower::Receptor::AsyncReceiver] Receiver for receptor's asynchronous responses
       # @param receptor_params [Hash] Params for Receptor node's Catalog HTTP plugin (@see https://github.com/mkanoor/receptor-catalog/README.md)
-      def get_tower_objects(connection, query_params, tower_types, on_premise: false, receptor_receiver: nil, receptor_params: {})
+      def get_tower_objects(connection, query_params, tower_types, slug: nil, on_premise: false, receptor_receiver: nil, receptor_params: {})
         api_calls_block = lambda do |&block|
           #
           # Initializing API Calls
-          api_objects = init_api_objects(connection, on_premise, query_params, receptor_params, receptor_receiver, tower_types)
+          api_objects = init_api_objects(connection, on_premise, query_params, receptor_params, receptor_receiver, tower_types, slug)
           #
           # Getting custom lambda block for transformation of API object to Parser compatible object
           parsing_transformation = yield if block_given?
@@ -120,20 +121,28 @@ module TopologicalInventory::AnsibleTower
         end
       end
 
-      def init_api_objects(connection, on_premise, query_params, receptor_params, receptor_receiver, tower_types)
+      def init_api_objects(connection, on_premise, query_params, receptor_params, receptor_receiver, tower_types, slug = nil)
         tower_types.collect do |entity_type|
           #
           # Creating Ansible/Receptor API client objects
           api_obj = on_premise ? connection.api.send(entity_type, receptor_receiver) : connection.api.send(entity_type)
           #
           # Logging Tower Full path
-          log_external_url("#{connection_manager.api_url(tower_hostname)}/#{api_obj.klass.endpoint}")
+          log_external_url("#{connection_manager.api_url(tower_hostname)}/#{slug || api_obj.klass.endpoint}")
           #
           # Calling Tower API
-          if on_premise
-            api_obj.all(query_params, receptor_params)
+          if slug
+            if on_premise
+              api_obj.find_all_by_url(slug, query_params, receptor_params)
+            else
+              api_obj.find_all_by_url(slug, query_params)
+            end
           else
-            api_obj.all(query_params)
+            if on_premise
+              api_obj.all(query_params, receptor_params)
+            else
+              api_obj.all(query_params)
+            end
           end
         end
       end

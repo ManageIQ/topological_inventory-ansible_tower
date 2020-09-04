@@ -26,7 +26,6 @@ module TopologicalInventory
 
         def process
           logger.info(status_log_msg)
-
           impl = "#{Operations}::#{model}".safe_constantize&.new(params, identity)
           if impl&.respond_to?(method)
             result = impl&.send(method)

@@ -1,8 +1,8 @@
-require "manageiq-messaging"
 require "topological_inventory/ansible_tower/logging"
 require "topological_inventory/ansible_tower/operations/processor"
 require "topological_inventory/ansible_tower/operations/source"
 require "topological_inventory/ansible_tower/connection_manager"
+require "topological_inventory/ansible_tower/messaging_client"
 require "topological_inventory/providers/common/operations/health_check"
 
 module TopologicalInventory
@@ -11,19 +11,15 @@ module TopologicalInventory
       class Worker
         include Logging
 
-        def initialize(messaging_client_opts = {})
-          self.messaging_client_opts = default_messaging_opts.merge(messaging_client_opts)
-        end
-
         def run
           TopologicalInventory::AnsibleTower::ConnectionManager.start_receptor_client
+          logger.info("Topological Inventory AnsibleTower Operations worker started...")
+
           # Open a connection to the messaging service
-          client = ManageIQ::Messaging::Client.open(messaging_client_opts)
           heartbeat_thread(client)
 
-          logger.info("Topological Inventory AnsibleTower Operations worker started...")
           client.subscribe_topic(queue_opts) do |message|
-            log_with(message.payload&.fetch_path('request_context','x-rh-insights-request-id')) do
+            log_with(message.payload&.fetch_path('request_context', 'x-rh-insights-request-id')) do
               model, method = message.message.to_s.split(".")
               logger.info("Received message #{model}##{method}, #{message.payload}")
               process_message(message)
@@ -39,7 +35,13 @@ module TopologicalInventory
 
         private
 
-        attr_accessor :messaging_client_opts
+        def client
+          @client ||= TopologicalInventory::AnsibleTower::MessagingClient.default.worker_listener
+        end
+
+        def queue_opts
+          TopologicalInventory::AnsibleTower::MessagingClient.default.worker_listener_queue_opts
+        end
 
         def process_message(message)
           Processor.process!(message)
@@ -51,27 +53,6 @@ module TopologicalInventory
         ensure
           message.ack
           TopologicalInventory::Providers::Common::Operations::HealthCheck.touch_file
-        end
-
-        def queue_name
-          "platform.topological-inventory.operations-ansible-tower"
-        end
-
-        def queue_opts
-          {
-            :auto_ack    => false,
-            :max_bytes   => 50_000,
-            :service     => queue_name,
-            :persist_ref => "topological-inventory-operations-ansible-tower"
-          }
-        end
-
-        def default_messaging_opts
-          {
-            :protocol   => :Kafka,
-            :client_ref => "topological-inventory-operations-ansible-tower",
-            :group_ref  => "topological-inventory-operations-ansible-tower"
-          }
         end
 
         # TODO: Probably move this to common eventually, if we need it elsewhere.
