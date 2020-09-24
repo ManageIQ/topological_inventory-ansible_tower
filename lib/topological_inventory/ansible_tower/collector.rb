@@ -29,6 +29,10 @@ module TopologicalInventory
         end
       end
 
+      # AsyncReceiver method that needs to be on EVERY instance of collector for receptor.
+      def response_received!
+      end
+
       private
 
       attr_accessor :connection_manager, :metrics, :tower_hostname

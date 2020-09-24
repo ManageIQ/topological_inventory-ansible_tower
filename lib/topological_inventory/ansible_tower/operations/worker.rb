@@ -13,10 +13,8 @@ module TopologicalInventory
 
         def run
           TopologicalInventory::AnsibleTower::ConnectionManager.start_receptor_client
+          sleep 5
           logger.info("Topological Inventory AnsibleTower Operations worker started...")
-
-          # Open a connection to the messaging service
-          heartbeat_thread(client)
 
           client.subscribe_topic(queue_opts) do |message|
             log_with(message.payload&.fetch_path('request_context', 'x-rh-insights-request-id')) do
@@ -28,7 +26,6 @@ module TopologicalInventory
         rescue => err
           logger.error("#{err.cause}\n#{err.backtrace.join("\n")}")
         ensure
-          heartbeat_thread.exit
           client&.close
           TopologicalInventory::AnsibleTower::ConnectionManager.stop_receptor_client
         end
@@ -53,18 +50,6 @@ module TopologicalInventory
         ensure
           message.ack
           TopologicalInventory::Providers::Common::Operations::HealthCheck.touch_file
-        end
-
-        # TODO: Probably move this to common eventually, if we need it elsewhere.
-        def heartbeat_thread(client = nil)
-          @heartbeat_thread ||= Thread.new do
-            loop do
-              sleep(15)
-              client.send(:topic_consumer, queue_opts[:persist_ref], nil).trigger_heartbeat!
-            rescue StandardError => e
-              logger.error("Exception in kafka heartbeat thread: #{e.message}, restarting...")
-            end
-          end
         end
       end
     end
