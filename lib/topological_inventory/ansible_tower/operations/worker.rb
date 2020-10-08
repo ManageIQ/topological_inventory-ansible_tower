@@ -4,6 +4,7 @@ require "topological_inventory/ansible_tower/operations/source"
 require "topological_inventory/ansible_tower/connection_manager"
 require "topological_inventory/ansible_tower/messaging_client"
 require "topological_inventory/providers/common/operations/health_check"
+require "topological_inventory/providers/common/operations/async_worker"
 
 module TopologicalInventory
   module AnsibleTower
@@ -11,22 +12,30 @@ module TopologicalInventory
       class Worker
         include Logging
 
+        ASYNC_MESSAGES = %w[Source.availability_check].freeze
+
         def run
-          TopologicalInventory::AnsibleTower::ConnectionManager.start_receptor_client
-          sleep 5
+          start_workers
           logger.info("Topological Inventory AnsibleTower Operations worker started...")
 
           client.subscribe_topic(queue_opts) do |message|
             log_with(message.payload&.fetch_path('request_context', 'x-rh-insights-request-id')) do
-              model, method = message.message.to_s.split(".")
-              logger.info("Received message #{model}##{method}, #{message.payload}")
-              process_message(message)
+              if ASYNC_MESSAGES.include?(message.message)
+                logger.debug("Queuing #{message.message} message for asynchronous processing...")
+                async_worker.enqueue(message)
+              else
+                model, method = message.message.to_s.split(".")
+                logger.info("Received message #{model}##{method}, #{message.payload}")
+
+                process_message(message)
+              end
             end
           end
         rescue => err
           logger.error("#{err.cause}\n#{err.backtrace.join("\n")}")
         ensure
           client&.close
+          async_worker&.stop
           TopologicalInventory::AnsibleTower::ConnectionManager.stop_receptor_client
         end
 
@@ -40,6 +49,10 @@ module TopologicalInventory
           TopologicalInventory::AnsibleTower::MessagingClient.default.worker_listener_queue_opts
         end
 
+        def async_worker
+          @async_worker ||= TopologicalInventory::Providers::Common::Operations::AsyncWorker.new(Processor)
+        end
+
         def process_message(message)
           Processor.process!(message)
         rescue StandardError => err
@@ -50,6 +63,11 @@ module TopologicalInventory
         ensure
           message.ack
           TopologicalInventory::Providers::Common::Operations::HealthCheck.touch_file
+        end
+
+        def start_workers
+          TopologicalInventory::AnsibleTower::ConnectionManager.start_receptor_client
+          async_worker.start
         end
       end
     end
