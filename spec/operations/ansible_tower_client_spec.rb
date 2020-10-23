@@ -1,6 +1,6 @@
-require "topological_inventory/ansible_tower/operations/core/ansible_tower_client"
+require "topological_inventory/ansible_tower/operations/ansible_tower_client"
 
-RSpec.describe TopologicalInventory::AnsibleTower::Operations::Core::AnsibleTowerClient do
+RSpec.describe TopologicalInventory::AnsibleTower::Operations::AnsibleTowerClient do
   let(:order_params) do
     {
       'service_plan_id'             => 1,
@@ -30,7 +30,7 @@ RSpec.describe TopologicalInventory::AnsibleTower::Operations::Core::AnsibleTowe
     let(:authentication) { nil }
 
     before do
-      allow(subject).to receive(:default_endpoint).and_return(default_endpoint)
+      allow(subject).to receive(:endpoint).and_return(default_endpoint)
       allow(subject).to receive(:authentication).and_return(authentication)
     end
 
@@ -39,7 +39,7 @@ RSpec.describe TopologicalInventory::AnsibleTower::Operations::Core::AnsibleTowe
       let(:default_endpoint) { SourcesApiClient::Endpoint.new(:receptor_node => receptor_node_id, :source_id => source_id.to_s) }
 
       it "connects through receptor connection" do
-        expect(subject.send(:ansible_tower)).to be_kind_of(TopologicalInventory::AnsibleTower::Receptor::Connection)
+        expect(subject.send(:connection)).to be_kind_of(TopologicalInventory::AnsibleTower::Receptor::Connection)
       end
     end
 
@@ -48,7 +48,7 @@ RSpec.describe TopologicalInventory::AnsibleTower::Operations::Core::AnsibleTowe
       let(:authentication) { SourcesApiClient::Authentication.new(:username => 'redhat', :password => 'redhat') }
 
       it "connects through ansible-tower-client connection" do
-        expect(subject.send(:ansible_tower)).to be_kind_of(::AnsibleTowerClient::Connection)
+        expect(subject.send(:connection)).to be_kind_of(::AnsibleTowerClient::Connection)
       end
     end
   end
@@ -60,7 +60,7 @@ RSpec.describe TopologicalInventory::AnsibleTower::Operations::Core::AnsibleTowe
 
     before do
       ansible_tower, @api = double, double
-      allow(subject).to receive(:ansible_tower).and_return(ansible_tower)
+      allow(subject).to receive(:connection).and_return(ansible_tower)
       allow(ansible_tower).to receive(:api).and_return(@api)
 
       allow(job_templates).to receive(:find).and_return(job_template)

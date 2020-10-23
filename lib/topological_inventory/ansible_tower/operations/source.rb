@@ -1,6 +1,6 @@
 require "topological_inventory/ansible_tower/logging"
 require "topological_inventory/providers/common/operations/source"
-require "topological_inventory/ansible_tower/cloud/connection"
+require "topological_inventory/ansible_tower/connection_manager"
 
 module TopologicalInventory
   module AnsibleTower
@@ -24,10 +24,6 @@ module TopologicalInventory
         rescue => e
           logger.availability_check("Failed to connect to Source id:#{source_id} - #{e.message}", :error)
           [STATUS_UNAVAILABLE, e.message]
-        end
-
-        def full_hostname(endpoint)
-          endpoint.host.tap { |host| host << ":#{endpoint.port}" if endpoint.port }
         end
       end
     end

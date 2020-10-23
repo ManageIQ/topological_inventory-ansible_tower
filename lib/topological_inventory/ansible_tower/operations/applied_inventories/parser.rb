@@ -1,5 +1,5 @@
 require "topological_inventory-api-client"
-require "topological_inventory/providers/common/operations/topology_api_client"
+require "topological_inventory/providers/common/mixins/topology_api"
 require "topological_inventory/ansible_tower/operations/applied_inventories/tree_item"
 
 module TopologicalInventory
@@ -16,7 +16,7 @@ module TopologicalInventory
         #
         class Parser
           include Logging
-          include Core::TopologyApiClient
+          include TopologicalInventory::Providers::Common::Mixins::TopologyApi
 
           attr_accessor :identity
 
@@ -79,7 +79,7 @@ module TopologicalInventory
           # @param parent_wf_template_tree_item [TopologicalInventory::AnsibleTower::Operations::AppliedInventories::TreeItem] tree item with Workflow Template
           def load_child_nodes(parent_wf_template_tree_item)
             root_wf_template = parent_wf_template_tree_item.item
-            topology_api_client.list_service_offering_nodes(:filter => { :root_service_offering_id => root_wf_template.id }).data.each do |node|
+            topology_api.api.list_service_offering_nodes(:filter => {:root_service_offering_id => root_wf_template.id}).data.each do |node|
               # Skip nodes of type 'inventory_update' or 'project_update'
               next unless %w[job workflow_job].include?(node.extra[:unified_job_type].to_s)
 
@@ -95,7 +95,7 @@ module TopologicalInventory
           def load_templates_for_nodes(parent_wf_template_tree_item)
             child_templates_ids = parent_wf_template_tree_item.children.collect { |tree_item| tree_item.item&.service_offering_id }.compact.uniq
 
-            service_offerings = topology_api_client.list_service_offerings(:filter => {:id => {:eq => child_templates_ids}}).data
+            service_offerings = topology_api.api.list_service_offerings(:filter => {:id => {:eq => child_templates_ids}}).data
             parent_wf_template_tree_item.children.each do |node_tree_item|
               template_tree_item = nil
               service_offerings.each do |template|
@@ -132,7 +132,7 @@ module TopologicalInventory
           def load_node_inventories
             if (nodes = node_inventories.keys).present?
               node_inventory_ids = nodes.map(&:service_inventory_id).compact.uniq
-              topology_api_client.list_service_inventories(:filter => { :id => { :eq => node_inventory_ids }}).data.each do |inventory|
+              topology_api.api.list_service_inventories(:filter => {:id => {:eq => node_inventory_ids}}).data.each do |inventory|
                 node_inventories.each_pair do |node, hash|
                   if node.service_inventory_id == inventory.id
                     hash[:inventory] = inventory
@@ -147,7 +147,7 @@ module TopologicalInventory
           def load_template_inventories
             if (templates = template_inventories.keys).present?
               template_inventory_ids = templates.map(&:service_inventory_id).compact.uniq
-              topology_api_client.list_service_inventories(:filter => { :id => { :eq => template_inventory_ids }}).data.each do |inventory|
+              topology_api.api.list_service_inventories(:filter => {:id => {:eq => template_inventory_ids}}).data.each do |inventory|
                 template_inventories.each_pair do |template, hash|
                   if template.service_inventory_id == inventory.id
                     hash[:inventory] = inventory
@@ -212,7 +212,7 @@ module TopologicalInventory
           end
 
           def load_inventory(inventory_id)
-            topology_api_client.show_service_inventory(inventory_id)
+            topology_api.api.show_service_inventory(inventory_id)
           end
 
           def inventory_for(node_or_template)

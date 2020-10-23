@@ -19,7 +19,7 @@ gem "receptor_controller-client", "~> 0.0.7"
 gem "sources-api-client", "~> 3.0"
 gem "topological_inventory-api-client", "~> 3.0"
 gem "topological_inventory-ingress_api-client", "~> 1.0.1"
-gem "topological_inventory-providers-common", "~> 1.0.12"
+gem "topological_inventory-providers-common", "~> 2.0.0"
 group :development, :test do
   gem "rspec"
   gem 'rubocop', "~>0.69.0"

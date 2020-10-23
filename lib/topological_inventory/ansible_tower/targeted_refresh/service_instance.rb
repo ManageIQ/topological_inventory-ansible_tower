@@ -1,35 +1,43 @@
 require "topological_inventory/ansible_tower/collector"
 require "topological_inventory/providers/common/operations/source"
-require "topological_inventory/providers/common/operations/sources_api_client"
+require "topological_inventory/providers/common/mixins/sources_api"
+require "topological_inventory/providers/common/mixins/x_rh_headers"
 require "topological_inventory/ansible_tower/receptor/async_receiver"
 
 module TopologicalInventory
   module AnsibleTower
     module TargetedRefresh
       class ServiceInstance < TopologicalInventory::AnsibleTower::Collector
+        include TopologicalInventory::Providers::Common::Mixins::SourcesApi
+        include TopologicalInventory::Providers::Common::Mixins::XRhHeaders
+
         REFS_PER_REQUEST_LIMIT = 20
 
         def initialize(payload = {})
+          self.operation = 'ServiceInstance'
           self.params    = payload['params']
           self.source_id = payload['source_id']
 
+          self.identity = params.to_a.first.to_h['request_context']
           # TODO: add metrics exporter
           super(payload['source_uid'], nil)
         end
 
         # Entrypoint for 'ServiceInstance.refresh' operation
         def refresh
+          self.operation = "#{operation}#refresh"
+
           return if params_missing?
 
           # Connection settings
           set_connection_data!
-          logger.info("ServiceInstance#refresh - Connection set successfully")
+          logger.info_ext(operation, "Connection set successfully")
 
           # Get all tasks
           tasks, refresh_state_uuid = {}, SecureRandom.uuid
           params.to_a.each do |task|
             if task['task_id'].blank? || task['source_ref'].blank?
-              logger.warn("ServiceInstance#refresh - missing data for task: #{task}")
+              logger.warn_ext(operation, "Missing data for task: #{task}")
               next
             end
             tasks[task['task_id']] = task['source_ref']
@@ -42,7 +50,7 @@ module TopologicalInventory
 
           refresh_part(tasks, refresh_state_uuid, SecureRandom.uuid) unless tasks.empty?
         rescue => err
-          logger.error("ServiceInstance#refresh - Error: #{err.message}\n#{err.backtrace.join("\n")}")
+          logger.error_ext(operation, "Error: #{err.message}\n#{err.backtrace.join("\n")}")
         end
 
         def async_save_inventory(refresh_state_uuid, parser)
@@ -52,12 +60,12 @@ module TopologicalInventory
         end
 
         def async_collecting_finished(entity_type, refresh_state_uuid, total_parts)
-          logger.info("ServiceInstance#refresh: finished collecting of #{entity_type} (#{refresh_state_uuid}). Total parts: #{total_parts}")
+          logger.info_ext(operation, "Finished collecting of #{entity_type} (#{refresh_state_uuid}). Total parts: #{total_parts}")
         end
 
         private
 
-        attr_accessor :params, :source_id
+        attr_accessor :identity, :operation, :params, :source_id
 
         def required_params
           %w[source_id source params]
@@ -67,7 +75,7 @@ module TopologicalInventory
           is_missing = false
           required_params.each do |attr|
             if (is_missing = send(attr).blank?)
-              logger.error("ServiceInstance#refresh - Missing #{attr} for the availability_check request [Source ID: #{source_id}]")
+              logger.error_ext(operation, "Missing #{attr} for the availability_check request [Source ID: #{source_id}]")
               break
             end
           end
@@ -114,28 +122,25 @@ module TopologicalInventory
           end
 
           # Sending to Ingress API
-          logger.info("ServiceInstance#refresh - Task[ id: #{tasks_id} ] Sending to Ingress API...")
+          logger.info_ext(operation, "Task[ id: #{tasks_id} ] Sending to Ingress API...")
           save_inventory(parser.collections.values, inventory_name, schema_name, refresh_state_uuid, refresh_state_part_uuid)
-          logger.info("ServiceInstance#refresh - Task[ id: #{tasks_id} ] Sending to Ingress API...Complete")
+          logger.info_ext(operation, "Task[ id: #{tasks_id} ] Sending to Ingress API...Complete")
         end
 
         def connection
           @connection ||= begin
                             tower_user = authentication.username unless on_premise?
                             tower_passwd = authentication.password unless on_premise?
+                            account_number = account_number_by_identity(identity) unless on_premise?
 
                             connection_manager.connect(
-                              :base_url       => tower_hostname,
+                              :base_url       => full_hostname(endpoint),
                               :username       => tower_user,
                               :password       => tower_passwd,
                               :receptor_node  => endpoint.receptor_node.to_s.strip,
                               :account_number => account_number
                             )
                           end
-        end
-
-        def on_premise?
-          @on_premise ||= endpoint.receptor_node.to_s.strip.present?
         end
 
         def set_connection_data!
@@ -146,51 +151,6 @@ module TopologicalInventory
           end
 
           self.tower_hostname = full_hostname(endpoint)
-        end
-
-        # TODO: Join with other operations
-        def endpoint
-          @endpoint ||= api_client.fetch_default_endpoint(source_id)
-        rescue => e
-          logger.error("ServiceInstance#refresh - Failed to fetch Endpoint for Source #{source_id}: #{e.message}")
-          nil
-        end
-
-        def authentication
-          @authentication ||= api_client.fetch_authentication(source_id, endpoint)
-        rescue => e
-          logger.error("ServiceInstance#refresh - Failed to fetch Authentication for Source #{source_id}: #{e.message}")
-          nil
-        end
-
-        # Queries Sources API in the context of first task
-        def identity
-          @identity ||= params.to_a.first['request_context']
-        end
-
-        def api_client
-          @api_client ||= TopologicalInventory::Providers::Common::Operations::SourcesApiClient.new(identity)
-        end
-
-        # TODO: Join with PR #112 (ordering)
-        def account_number
-          return unless on_premise?
-          return @account_number if @account_number
-          return if identity.try(:[], 'x-rh-identity').nil?
-
-          identity_hash = JSON.parse(Base64.decode64(identity['x-rh-identity']))
-          @account_number = identity_hash.dig('identity', 'account_number')
-        rescue JSON::ParserError => e
-          logger.error("ServiceInstance#refresh - Failed to parse identity header: #{e.message}")
-          nil
-        end
-
-        def full_hostname(endpoint)
-          if on_premise?
-            "receptor://#{endpoint.receptor_node}"
-          else
-            endpoint.host.tap { |host| host << ":#{endpoint.port}" if endpoint.port }
-          end
         end
 
         def default_refresh_type

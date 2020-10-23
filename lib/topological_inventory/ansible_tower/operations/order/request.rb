@@ -1,13 +1,28 @@
+require "topological_inventory-api-client"
+require "topological_inventory/providers/common/mixins/topology_api"
+require "topological_inventory/ansible_tower/operations/ansible_tower_client"
+
 module TopologicalInventory
   module AnsibleTower
     module Operations
-      module Core
-        module ServiceOrderMixin
+      module Order
+        class Request
+          include Logging
+          include TopologicalInventory::Providers::Common::Mixins::TopologyApi
+
+          attr_accessor :operation, :params, :identity
+
+          def initialize(params, identity, operation_name = 'ServiceOffering#order')
+            self.operation = operation_name
+            self.params = params
+            self.identity = identity
+          end
+
           # Service Offerings (Job Templates) are launched in AnsibleTower
           # and Task updated to "running" state.
           # Update "running" => "complete" happens in persister
           # - see https://github.com/RedHatInsights/topological_inventory-core/blob/eef46cf31ff69d2aefb0863ef6147f36ff20b9d3/lib/topological_inventory/schema/default.rb#L68
-          def order
+          def run
             task_id, service_offering_id, service_plan_id, order_params = params.values_at(
               "task_id", "service_offering_id", "service_plan_id", "order_params")
 
@@ -15,9 +30,9 @@ module TopologicalInventory
 
             update_task(task_id, :state => "running", :status => "ok")
 
-            service_plan          = topology_api_client.show_service_plan(service_plan_id.to_s) if service_plan_id
+            service_plan          = topology_api.api.show_service_plan(service_plan_id.to_s) if service_plan_id
             service_offering_id ||= service_plan.service_offering_id
-            service_offering      = topology_api_client.show_service_offering(service_offering_id.to_s)
+            service_offering      = topology_api.api.show_service_offering(service_offering_id.to_s)
 
             source_id = service_offering.source_id
             client    = ansible_tower_client(source_id, task_id, identity)
@@ -51,7 +66,7 @@ module TopologicalInventory
           end
 
           def ansible_tower_client(source_id, task_id, identity)
-            Core::AnsibleTowerClient.new(source_id, task_id, identity)
+            TopologicalInventory::AnsibleTower::Operations::AnsibleTowerClient.new(source_id, task_id, identity)
           end
 
           # Type defined by collector here:
@@ -59,7 +74,8 @@ module TopologicalInventory
           def parse_svc_offering_type(service_offering)
             job_type = service_offering.extra[:type] if service_offering.extra.present?
 
-            raise "Missing service_offering's type: #{service_offering.inspect}" if job_type.blank?
+            raise "Missing service_offerings's type: #{service_offering.inspect}" if job_type.blank?
+
             job_type
           end
         end

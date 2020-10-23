@@ -1,4 +1,4 @@
-require "topological_inventory/ansible_tower/operations/core/ansible_tower_client"
+require "topological_inventory/ansible_tower/operations/ansible_tower_client"
 
 module TopologicalInventory::AnsibleTower
   class Parser < TopologicalInventory::Providers::Common::Collector::Parser
@@ -37,7 +37,7 @@ module TopologicalInventory::AnsibleTower
     attr_accessor :tower_url
 
     def tower_client_class
-      TopologicalInventory::AnsibleTower::Operations::Core::AnsibleTowerClient
+      TopologicalInventory::AnsibleTower::Operations::AnsibleTowerClient
     end
   end
 end

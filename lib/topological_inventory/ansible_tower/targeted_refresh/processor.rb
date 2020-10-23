@@ -1,9 +1,5 @@
 require "topological_inventory/ansible_tower/logging"
-require "topological_inventory-api-client"
-# TODO: switch to providers-common
-require "topological_inventory/ansible_tower/operations/core/topology_api_client"
-require "topological_inventory/ansible_tower/operations/processor"
-
+require "topological_inventory/providers/common/mixins/topology_api"
 require "topological_inventory/ansible_tower/targeted_refresh/service_instance"
 
 module TopologicalInventory
@@ -11,7 +7,7 @@ module TopologicalInventory
     module TargetedRefresh
       class Processor
         include Logging
-        include TopologicalInventory::AnsibleTower::Operations::Core::TopologyApiClient
+        include TopologicalInventory::Providers::Common::Mixins::TopologyApi
 
         def self.process!(message, payload)
           model, method = message.message.to_s.split(".")

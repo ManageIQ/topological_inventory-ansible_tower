@@ -1,15 +1,13 @@
 require "topological_inventory/ansible_tower/logging"
-require "topological_inventory-api-client"
-require "topological_inventory/ansible_tower/operations/core/topology_api_client"
+require "topological_inventory/providers/common/mixins/topology_api"
 require "topological_inventory/ansible_tower/operations/service_offering"
-require "topological_inventory/ansible_tower/operations/service_plan"
 
 module TopologicalInventory
   module AnsibleTower
     module Operations
       class Processor
         include Logging
-        include Core::TopologyApiClient
+        include TopologicalInventory::Providers::Common::Mixins::TopologyApi
 
         def self.process!(message)
           model, method = message.message.to_s.split(".")
