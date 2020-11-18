@@ -131,7 +131,7 @@ module TopologicalInventory
           @connection ||= begin
                             tower_user = authentication.username unless on_premise?
                             tower_passwd = authentication.password unless on_premise?
-                            account_number = account_number_by_identity(identity) unless on_premise?
+                            account_number = account_number_by_identity(identity)
 
                             connection_manager.connect(
                               :base_url       => full_hostname(endpoint),
