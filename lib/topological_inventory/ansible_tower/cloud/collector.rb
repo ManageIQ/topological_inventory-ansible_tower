@@ -4,8 +4,8 @@ module TopologicalInventory::AnsibleTower
   module Cloud
     class Collector < TopologicalInventory::AnsibleTower::Collector
       def initialize(source, tower_hostname, tower_user, tower_passwd, metrics,
-                     default_limit: 100, poll_time: 60, standalone_mode: true)
-        super(source, metrics, :default_limit => default_limit, :poll_time => poll_time, :standalone_mode => standalone_mode)
+                     default_limit: 100, standalone_mode: true)
+        super(source, metrics, :default_limit => default_limit, :standalone_mode => standalone_mode)
 
         self.tower_hostname = tower_hostname
         self.tower_user     = tower_user
@@ -31,6 +31,8 @@ module TopologicalInventory::AnsibleTower
         cnt, sweep_scope, total_parts = 0, Set.new, 0
         # each on ansible_tower_client's enumeration makes pagination requests by itself
         opts = {:page_size => limits[entity_type]}
+        opts[:modified__gt] = last_modified_at if scheduler.do_partial_refresh?(source)
+
         send("get_#{entity_type}", connection, opts).each do |entity|
           refresh_state_part_collected_at = Time.now.utc
           cnt += 1
@@ -56,11 +58,13 @@ module TopologicalInventory::AnsibleTower
         end
         logger.collecting(:finish, source, entity_type, refresh_state_uuid, total_parts)
 
-        # Sweeping inactive records
-        sweep_scope = sweep_scope.to_a
-        logger.sweeping(:start, source, sweep_scope, refresh_state_uuid)
-        sweep_inventory(inventory_name, schema_name, refresh_state_uuid, total_parts, sweep_scope, refresh_state_started_at)
-        logger.sweeping(:finish, source, sweep_scope, refresh_state_uuid)
+        unless scheduler.do_partial_refresh?(source)
+          # Sweeping (archiving) inactive records
+          sweep_scope = sweep_scope.to_a
+          logger.sweeping(:start, source, sweep_scope, refresh_state_uuid)
+          sweep_inventory(inventory_name, schema_name, refresh_state_uuid, total_parts, sweep_scope, refresh_state_started_at)
+          logger.sweeping(:finish, source, sweep_scope, refresh_state_uuid)
+        end
       rescue => e
         metrics.record_error
         logger.collecting_error(source, entity_type, refresh_state_uuid, e)

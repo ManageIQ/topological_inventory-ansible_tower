@@ -9,6 +9,7 @@ require "bundler/setup"
 require "topological_inventory/ansible_tower/cloud/collector"
 require "topological_inventory/ansible_tower/receptor/collector"
 require "topological_inventory/ansible_tower/collectors_pool"
+require "topological_inventory/ansible_tower/collector/scheduler"
 require "topological_inventory/ansible_tower/collector/application_metrics"
 
 def parse_args
@@ -81,6 +82,11 @@ ReceptorController::Client.configure do |config|
   config.pre_shared_key    = args[:receptor_controller_psk]
 end
 
+TopologicalInventory::AnsibleTower::Collector::Scheduler.configure do |config|
+  config.full_refresh_frequency = (ENV['COLLECTOR_FULL_REFRESH_FREQUENCY'] || 3600).to_i
+  config.partial_refresh_frequency = (ENV['COLLECTOR_PARTIAL_REFRESH_FREQUENCY'] || ENV['COLLECTOR_POLL_TIME'] || 300).to_i
+end
+
 
 metrics = TopologicalInventory::AnsibleTower::Collector::ApplicationMetrics.new(args[:metrics_port])
 if args[:config].nil?
@@ -97,6 +103,9 @@ if args[:config].nil?
                                                                             metrics,
                                                                             :default_limit => args[:page_size])
               end
+
+  scheduler = TopologicalInventory::AnsibleTower::Collector::Scheduler.default
+  scheduler.add_source(args[:source])
 
   collector.collect!
 else

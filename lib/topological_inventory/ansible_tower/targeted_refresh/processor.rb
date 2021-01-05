@@ -9,6 +9,9 @@ module TopologicalInventory
         include Logging
         include TopologicalInventory::Providers::Common::Mixins::TopologyApi
 
+        # Messages older than threshold are skipped
+        SENT_AT_THRESHOLD = 300
+
         def self.process!(message, payload)
           model, method = message.message.to_s.split(".")
           new(model, method, payload).process
@@ -18,9 +21,12 @@ module TopologicalInventory
           self.model = model
           self.method = method
           self.payload = payload
+          self.sent_at_threshold = (ENV['SENT_AT_THRESHOLD'] || SENT_AT_THRESHOLD).to_i.seconds
         end
 
         def process
+          return if skip_old_payload?
+
           logger.info(status_log_msg)
           impl = "#{TargetedRefresh}::#{model}".safe_constantize&.new(payload)
           if impl&.respond_to?(method)
@@ -37,7 +43,14 @@ module TopologicalInventory
 
         private
 
-        attr_accessor :identity, :model, :method, :payload
+        attr_accessor :identity, :model, :method, :payload, :sent_at_threshold
+
+        def skip_old_payload?
+          sent_at = Time.parse(payload['sent_at']).utc
+          sent_at < sent_at_threshold.ago.utc
+        rescue
+          true # Skip incompatible payloads
+        end
 
         def update_tasks
           with_params do

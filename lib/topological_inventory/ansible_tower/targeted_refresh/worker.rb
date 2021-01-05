@@ -14,12 +14,18 @@ module TopologicalInventory
           TopologicalInventory::AnsibleTower::ConnectionManager.start_receptor_client
 
           # Open a connection to the messaging service
-          logger.info("Topological Inventory AnsibleTower Refresh worker started...")
-          client.subscribe_topic(queue_opts) do |message|
-            process_message(message)
+          begin
+            logger.info("Topological Inventory AnsibleTower Refresh worker started...")
+            client.subscribe_topic(queue_opts) do |message|
+              process_message(message)
+            end
+          rescue Rdkafka::RdkafkaError => err
+            logger.error("#{err.class.name}\n#{err.message}\n#{err.backtrace.join("\n")}")
+            client(:renew => true)
+            retry
           end
         rescue => err
-          logger.error("#{err.cause}\n#{err.backtrace.join("\n")}")
+          logger.error("#{err.class.name}\n#{err.message}\n#{err.backtrace.join("\n")}")
         ensure
           client&.close
           TopologicalInventory::AnsibleTower::ConnectionManager.stop_receptor_client
@@ -27,8 +33,10 @@ module TopologicalInventory
 
         private
 
-        def client
-          @client ||= TopologicalInventory::AnsibleTower::MessagingClient.default.targeted_refresh_listener
+        def client(renew: false)
+          @client = nil if renew
+
+          @client ||= TopologicalInventory::AnsibleTower::MessagingClient.default.targeted_refresh_listener(:renew => renew)
         end
 
         def queue_opts
@@ -39,10 +47,8 @@ module TopologicalInventory
           model, method = message.message.to_s.split(".")
           payload = JSON.parse(message.payload) if message.payload.present?
 
-          log_with(request_ids(payload)) do
-            logger.info("Received message #{model}##{method}, #{payload}")
-            TargetedRefresh::Processor.process!(message, payload)
-          end
+          logger.info("Received message #{model}##{method}, #{payload}")
+          TargetedRefresh::Processor.process!(message, payload)
         rescue JSON::ParserError
           logger.error("#{model}##{method} - Failed to parse payload: #{message.payload}")
           raise
@@ -51,15 +57,10 @@ module TopologicalInventory
                        ids = payload['params'].to_a.collect { |task| task['task_id'] }
                        ids.compact!
                      end
-          logger.error("#{model}##{method} - Task[ id: #{tasks_id.to_a.join(' | id: ')} ] #{err.cause}\n#{err}\n#{err.backtrace.join("\n")}")
+          logger.error("#{model}##{method} - Task[ id: #{tasks_id.to_a.join(' | id: ')} ] #{err.class.name}\n#{err.message}\n#{err}\n#{err.backtrace.join("\n")}")
           raise
         ensure
           message.ack
-        end
-
-        def request_ids(payload)
-          ids = payload['params'].to_a.collect { |param| param['request_context'] }
-          ids.join(' ')
         end
       end
     end

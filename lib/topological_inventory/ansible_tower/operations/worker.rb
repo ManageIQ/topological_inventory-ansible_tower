@@ -1,8 +1,8 @@
 require "topological_inventory/ansible_tower/logging"
 require "topological_inventory/ansible_tower/operations/processor"
-require "topological_inventory/ansible_tower/operations/source"
 require "topological_inventory/ansible_tower/connection_manager"
 require "topological_inventory/ansible_tower/messaging_client"
+require "topological_inventory/providers/common/mixins/statuses"
 require "topological_inventory/providers/common/operations/health_check"
 require "topological_inventory/providers/common/operations/async_worker"
 
@@ -11,8 +11,13 @@ module TopologicalInventory
     module Operations
       class Worker
         include Logging
+        include TopologicalInventory::Providers::Common::Mixins::Statuses
 
         ASYNC_MESSAGES = %w[Source.availability_check].freeze
+
+        def initialize(metrics)
+          self.metrics = metrics
+        end
 
         def run
           start_workers
@@ -41,6 +46,8 @@ module TopologicalInventory
 
         private
 
+        attr_accessor :metrics
+
         def client
           @client ||= TopologicalInventory::AnsibleTower::MessagingClient.default.worker_listener
         end
@@ -50,16 +57,18 @@ module TopologicalInventory
         end
 
         def async_worker
-          @async_worker ||= TopologicalInventory::Providers::Common::Operations::AsyncWorker.new(Processor)
+          @async_worker ||= TopologicalInventory::Providers::Common::Operations::AsyncWorker.new(Processor, :metrics => metrics)
         end
 
         def process_message(message)
-          Processor.process!(message)
+          result = Processor.process!(message, metrics)
+          metrics&.record_operation(message.message, :status => result)
         rescue StandardError => err
           model, method = message.message.to_s.split(".")
-          task_id = message.payload&.fetch_path('params','task_id')
+          task_id = message.payload&.fetch_path('params', 'task_id')
+
           logger.error("#{model}##{method}: Task(id: #{task_id}) #{err.cause}\n#{err}\n#{err.backtrace.join("\n")}")
-          raise
+          metrics&.record_operation(message.message, :status => operation_status[:error])
         ensure
           message.ack
           TopologicalInventory::Providers::Common::Operations::HealthCheck.touch_file

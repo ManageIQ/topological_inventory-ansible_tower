@@ -22,10 +22,11 @@ RSpec.describe TopologicalInventory::AnsibleTower::TargetedRefresh::Processor do
       let(:message) do
         double(:message => 'ServiceInstance.refresh',
                :payload => {
-                 :source_id  => '1',
-                 :source_uid => '3bfb8667-2b00-480b-bcbf-452bfb34a440',
-                 :params     => [{:task_id => '1', :source_ref => job_refs[0], :request_context => {"x-rh-identity" => "xxx", "x-rh-insights-request-id" => "111"}},
-                                 {:task_id => '2', :source_ref => job_refs[1], :request_context => {"x-rh-identity" => "yyy", "x-rh-insights-request-id" => "222"}}]
+                 'source_id'  => '1',
+                 'source_uid' => '3bfb8667-2b00-480b-bcbf-452bfb34a440',
+                 'sent_at'    => Time.now.utc.iso8601,
+                 'params'     => [{:task_id => '1', :source_ref => job_refs[0], :request_context => {"x-rh-identity" => "xxx", "x-rh-insights-request-id" => "111"}},
+                                  {:task_id => '2', :source_ref => job_refs[1], :request_context => {"x-rh-identity" => "yyy", "x-rh-insights-request-id" => "222"}}]
                })
       end
 
@@ -43,11 +44,61 @@ RSpec.describe TopologicalInventory::AnsibleTower::TargetedRefresh::Processor do
       end
     end
 
+    context "on operation without valid timestamp" do
+      let(:job_refs) { %w[10 20] }
+
+      subject { described_class.new('ServiceInstance', 'refresh', message.payload) }
+
+      context "without timestamp" do
+        let(:message) do
+          double(:message => 'ServiceInstance.refresh',
+                 :payload => {
+                   'source_id'  => '1',
+                   'source_uid' => '3bfb8667-2b00-480b-bcbf-452bfb34a440',
+                   'params'     => [{:task_id => '1', :source_ref => job_refs[0], :request_context => {"x-rh-identity" => "xxx", "x-rh-insights-request-id" => "111"}},
+                                    {:task_id => '2', :source_ref => job_refs[1], :request_context => {"x-rh-identity" => "yyy", "x-rh-insights-request-id" => "222"}}]
+                 })
+        end
+
+
+        it "doesn't call the operation" do
+          expect(subject.send(:skip_old_payload?)).to be_truthy
+
+          expect(TopologicalInventory::AnsibleTower::TargetedRefresh::ServiceInstance).not_to receive(:new)
+
+          subject.process
+        end
+      end
+
+      context "with old timestamp" do
+        let(:message) do
+          double(:message => 'ServiceInstance.refresh',
+                 :payload => {
+                   'source_id'  => '1',
+                   'source_uid' => '3bfb8667-2b00-480b-bcbf-452bfb34a440',
+                   'sent_at'    => 1.year.ago.utc.iso8601,
+                   'params'     => [{:task_id => '1', :source_ref => job_refs[0], :request_context => {"x-rh-identity" => "xxx", "x-rh-insights-request-id" => "111"}},
+                                    {:task_id => '2', :source_ref => job_refs[1], :request_context => {"x-rh-identity" => "yyy", "x-rh-insights-request-id" => "222"}}]
+                 })
+        end
+
+
+        it "doesn't call the operation" do
+          expect(subject.send(:skip_old_payload?)).to be_truthy
+
+          expect(TopologicalInventory::AnsibleTower::TargetedRefresh::ServiceInstance).not_to receive(:new)
+
+          subject.process
+        end
+      end
+    end
+
     context "on not implemented operation" do
       let(:message) do
         double(:message => 'SomeModel.some_method',
                :payload => {
-                 :params => [{:task_id => 1}, {:task_id => 2}]
+                 'sent_at' => Time.now.utc.iso8601,
+                 'params'  => [{:task_id => 1}, {:task_id => 2}]
                }.to_json)
       end
 
@@ -78,7 +129,8 @@ RSpec.describe TopologicalInventory::AnsibleTower::TargetedRefresh::Processor do
         let(:message) do
           double(:message => 'SomeModel.some_method',
                  :payload => {
-                   :params => [{:source_id => 1}, {:source_id => 2}]
+                   'sent_at' => Time.now.utc.iso8601,
+                   'params'  => [{:source_id => 1}, {:source_id => 2}]
                  }.to_json)
         end
 

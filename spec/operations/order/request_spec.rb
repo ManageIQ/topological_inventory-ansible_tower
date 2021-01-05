@@ -2,8 +2,9 @@ require "topological_inventory-api-client"
 require "topological_inventory/ansible_tower/operations/order/request"
 
 RSpec.describe TopologicalInventory::AnsibleTower::Operations::Order::Request do
-  context "#order" do
-    let(:subject)  { described_class.new(params, identity) }
+  context "#run" do
+    let(:metrics)  { double('Metrics') }
+    let(:subject)  { described_class.new(params, identity, metrics) }
     let(:identity) { {"account_number" => "12345"} }
     let(:service_offering) do
       TopologicalInventoryApiClient::ServiceOffering.new(
@@ -28,11 +29,15 @@ RSpec.describe TopologicalInventory::AnsibleTower::Operations::Order::Request do
 
     let(:ansible_tower_client) { TopologicalInventory::AnsibleTower::Operations::AnsibleTowerClient.new('1', params['task_id']) }
 
+    let(:api) { double("API") }
+    let(:topology_api_client) { double("Topological API Client", :api => api) }
+
+    before do
+      expect(subject).to receive(:topology_api).and_return(topology_api_client)
+    end
+
     it "ordering the service offering" do
       expect(subject).to receive(:update_task).with(1, :state => "running", :status => "ok")
-      api = double("Sources API")
-      topology_api_client = double(:api => api)
-      expect(subject).to receive(:topology_api).and_return(topology_api_client)
       expect(api).to(receive(:show_service_offering).with("1")
                        .and_return(service_offering))
 
@@ -46,7 +51,7 @@ RSpec.describe TopologicalInventory::AnsibleTower::Operations::Order::Request do
 
       allow(ansible_tower_client).to receive(:job_external_url).and_return('https://tower.example.com/job/1')
       expect(ansible_tower_client).to receive(:order_service)
-        .with(service_offering.extra.dig(:type), service_offering.source_ref, params["order_params"])
+        .with(service_offering.extra[:type], service_offering.source_ref, params["order_params"])
         .and_return(job)
 
       expect(subject).to(receive(:update_task)
@@ -62,7 +67,18 @@ RSpec.describe TopologicalInventory::AnsibleTower::Operations::Order::Request do
                                  :source_id         => '1',
                                  :target_source_ref => job.id.to_s,
                                  :target_type       => 'ServiceInstance'))
-      subject.run
+      status = subject.run
+      expect(status).to eq(subject.operation_status[:success])
+    end
+
+    it "ordering service_offering with exception" do
+      allow(subject).to receive(:logger).and_return(double.as_null_object)
+
+      allow(subject).to receive(:update_task)
+      expect(api).to receive(:show_service_offering).and_raise(TopologicalInventoryApiClient::ApiError)
+
+      expect(metrics).to receive(:record_error).with(:order)
+      expect(subject.run).to eq(subject.operation_status[:error])
     end
   end
 end

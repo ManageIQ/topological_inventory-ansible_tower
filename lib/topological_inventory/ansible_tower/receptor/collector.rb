@@ -29,11 +29,18 @@ module TopologicalInventory::AnsibleTower
 
         logger.collecting(:start, source, entity_type, refresh_state_uuid)
 
-        receiver = AsyncReceiver.new(self, connection, entity_type, refresh_state_uuid, refresh_state_started_at)
+        sweeping_disabled = scheduler.do_partial_refresh?(source) && last_modified_at.present?
+        receiver = AsyncReceiver.new(self,
+                                     connection,
+                                     entity_type,
+                                     refresh_state_uuid,
+                                     refresh_state_started_at,
+                                     :sweeping_enabled => !sweeping_disabled)
 
         # opts = {:fetch_all_pages => true, :accept_encoding => 'gzip', :apply_filter => nil}
         receptor_params = {:accept_encoding => 'gzip', :fetch_all_pages => true}
         query_params    = {:page_size => limits[entity_type]}
+        query_params[:modified__gt] = last_modified_at if scheduler.do_partial_refresh?(source)
         send("get_#{entity_type}", connection, query_params,
              :on_premise => true, :receptor_receiver => receiver, :receptor_params => receptor_params)
       end
@@ -48,6 +55,7 @@ module TopologicalInventory::AnsibleTower
         save_inventory(parser.collections.values, inventory_name, schema_name, refresh_state_uuid, refresh_state_part_uuid, refresh_state_part_collected_at)
       end
 
+      # Not called by partial refresh
       def async_sweep_inventory(refresh_state_uuid, sweep_scope, total_parts, refresh_state_started_at)
         logger.sweeping(:start, source, sweep_scope, refresh_state_uuid)
 

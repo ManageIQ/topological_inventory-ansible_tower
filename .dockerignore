@@ -1,3 +1,5 @@
 Dockerfile
 Gemfile.lock
 .git
+vendor/*
+.bundle/*

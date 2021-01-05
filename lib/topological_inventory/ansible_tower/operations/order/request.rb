@@ -1,4 +1,5 @@
 require "topological_inventory-api-client"
+require "topological_inventory/providers/common/mixins/statuses"
 require "topological_inventory/providers/common/mixins/topology_api"
 require "topological_inventory/ansible_tower/operations/ansible_tower_client"
 
@@ -8,14 +9,16 @@ module TopologicalInventory
       module Order
         class Request
           include Logging
+          include TopologicalInventory::Providers::Common::Mixins::Statuses
           include TopologicalInventory::Providers::Common::Mixins::TopologyApi
 
-          attr_accessor :operation, :params, :identity
+          attr_accessor :identity, :metrics, :operation, :params
 
-          def initialize(params, identity, operation_name = 'ServiceOffering#order')
+          def initialize(params, identity, metrics = nil, operation_name = 'ServiceOffering#order')
+            self.identity  = identity
+            self.metrics   = metrics
             self.operation = operation_name
-            self.params = params
-            self.identity = identity
+            self.params    = params
           end
 
           # Service Offerings (Job Templates) are launched in AnsibleTower
@@ -26,7 +29,7 @@ module TopologicalInventory
             task_id, service_offering_id, service_plan_id, order_params = params.values_at(
               "task_id", "service_offering_id", "service_plan_id", "order_params")
 
-            logger.info("ServiceOffering#order: Task(id: #{task_id}), ServiceOffering(:id #{service_offering_id}): Order method entered")
+            logger.info_ext(operation, "Task(id: #{task_id}), ServiceOffering(:id #{service_offering_id}): Order method entered")
 
             update_task(task_id, :state => "running", :status => "ok")
 
@@ -39,9 +42,9 @@ module TopologicalInventory
 
             job_type = parse_svc_offering_type(service_offering)
 
-            logger.info("ServiceOffering#order: Task(id: #{task_id}): Ordering ServiceOffering(id: #{service_offering.id}, source_ref: #{service_offering.source_ref}): Launching Job...")
+            logger.info_ext(operation, "Task(id: #{task_id}): Ordering ServiceOffering(id: #{service_offering.id}, source_ref: #{service_offering.source_ref}): Launching Job...")
             job = client.order_service(job_type, service_offering.source_ref, order_params)
-            logger.info("ServiceOffering#order: Task(id: #{task_id}): Ordering ServiceOffering(id: #{service_offering.id}, source_ref: #{service_offering.source_ref}): Job(:id #{job&.id}) has launched.")
+            logger.info_ext(operation, "Task(id: #{task_id}): Ordering ServiceOffering(id: #{service_offering.id}, source_ref: #{service_offering.source_ref}): Job(:id #{job&.id}) has launched.")
 
             context = {
               :service_instance => {
@@ -57,12 +60,15 @@ module TopologicalInventory
                         :target_source_ref => job.id.to_s,
                         :target_type       => "ServiceInstance")
 
-            logger.info("ServiceOffering#order: Task(id: #{task_id}): Ordering ServiceOffering(id: #{service_offering.id}, source_ref: #{service_offering.source_ref})...Task updated")
-          rescue StandardError => err
-            logger.error("ServiceOffering#order: Task(id: #{task_id}), ServiceOffering(id: #{service_offering&.id} source_ref: #{service_offering&.source_ref}): Ordering error: #{err.cause} #{err}\n#{err.backtrace.join("\n")}")
+            logger.info_ext(operation, "Task(id: #{task_id}): Ordering ServiceOffering(id: #{service_offering.id}, source_ref: #{service_offering.source_ref})...Task updated")
+            operation_status[:success]
+          rescue => err
+            logger.error_ext(operation, "Task(id: #{task_id}), ServiceOffering(id: #{service_offering&.id} source_ref: #{service_offering&.source_ref}): Ordering error: #{err.cause} #{err}\n#{err.backtrace.join("\n")}")
+            metrics&.record_error(:order)
             err_context = {:error => err.to_s}
             err_context = err_context.merge(context) if context.present?
             update_task(task_id, :state => "completed", :status => "error", :context => err_context)
+            operation_status[:error]
           end
 
           def ansible_tower_client(source_id, task_id, identity)

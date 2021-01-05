@@ -1,4 +1,5 @@
 require "topological_inventory-api-client"
+require "topological_inventory/providers/common/mixins/statuses"
 require "topological_inventory/providers/common/mixins/topology_api"
 require "topological_inventory/ansible_tower/operations/applied_inventories/parser"
 
@@ -8,13 +9,16 @@ module TopologicalInventory
       module AppliedInventories
         class Request
           include Logging
+          include TopologicalInventory::Providers::Common::Mixins::Statuses
           include TopologicalInventory::Providers::Common::Mixins::TopologyApi
 
-          attr_accessor :params, :identity
+          attr_accessor :identity, :metrics, :operation, :params
 
-          def initialize(params, identity)
-            self.params   = params
-            self.identity = identity
+          def initialize(params, identity, metrics = nil, operation_name = 'ServiceOffering#applied_inventories')
+            self.identity  = identity
+            self.metrics   = metrics
+            self.operation = operation_name
+            self.params    = params
           end
 
           def run
@@ -34,9 +38,12 @@ module TopologicalInventory
                           end
 
             update_task(task_id, :state => "completed", :status => "ok", :context => {:applied_inventories => inventories.map(&:id)})
-          rescue StandardError => err
-            logger.error("[Task #{task_id}] AppliedInventories error: #{err}\n#{err.backtrace.join("\n")}")
+            operation_status[:success]
+          rescue => err
+            logger.error_ext(operation, "Task(id: #{task_id}): #{err}\n#{err.backtrace.join("\n")}")
+            metrics&.record_error(:applied_inventories)
             update_task(task_id, :state => "completed", :status => "error", :context => {:error => err.to_s})
+            operation_status[:error]
           end
 
           private

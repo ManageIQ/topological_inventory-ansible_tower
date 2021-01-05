@@ -9,6 +9,7 @@ RSpec.describe TopologicalInventory::AnsibleTower::TargetedRefresh::Worker do
   before do
     allow(subject).to receive(:client).and_return(client)
     allow(client).to receive(:close)
+    TopologicalInventory::AnsibleTower::MessagingClient.class_variable_set(:@@default, nil)
   end
 
   describe "#run" do

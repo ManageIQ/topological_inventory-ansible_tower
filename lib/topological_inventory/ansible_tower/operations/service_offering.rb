@@ -5,19 +5,20 @@ module TopologicalInventory
   module AnsibleTower
     module Operations
       class ServiceOffering
-        attr_accessor :params, :identity
+        attr_accessor :metrics, :params, :identity
 
-        def initialize(params = {}, identity = nil)
+        def initialize(params = {}, identity = nil, metrics = nil)
           @params   = params
           @identity = identity
+          @metrics  = metrics
         end
 
         def order
-          Order::Request.new(params, identity).run
+          Order::Request.new(params, identity, metrics).run
         end
 
         def applied_inventories
-          AppliedInventories::Request.new(params, identity).run
+          AppliedInventories::Request.new(params, identity, metrics).run
         end
       end
     end

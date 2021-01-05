@@ -33,7 +33,7 @@ RSpec.describe TopologicalInventory::AnsibleTower::TargetedRefresh::ServiceInsta
       end
 
       let(:job) do
-        double(:id                      => '1',
+        double(:id                      => job_refs[0],
                :type                    => 'job',
                :artifacts               => nil,
                :extra_vars_hash         => nil,
@@ -45,7 +45,7 @@ RSpec.describe TopologicalInventory::AnsibleTower::TargetedRefresh::ServiceInsta
       end
 
       let(:workflow) do
-        double(:id                      => '2',
+        double(:id                      => job_refs[1],
                :type                    => 'workflow_job',
                :extra_vars_hash         => nil,
                :finished                => Time.now.utc,
@@ -98,6 +98,35 @@ RSpec.describe TopologicalInventory::AnsibleTower::TargetedRefresh::ServiceInsta
           end
 
           expect(subject).to receive(:save_inventory).twice
+
+          subject.refresh
+        end
+      end
+
+      context "with missing workflow in response" do
+        let(:service_instances) do
+          [
+            {:job => job, :job_type => :job},
+          ]
+        end
+
+        it "saves missing workflow with archived timestamp" do
+          stub_const("#{described_class}::REFS_PER_REQUEST_LIMIT", 10)
+
+          expect(subject).to receive(:refresh_part).and_call_original.once
+          expect(subject).to(receive(:get_service_instances)
+                               .with(subject.send(:connection), :id__in => job_refs.join(','), :page_size => subject.send(:limits)['service_instances'])
+                               .and_return(service_instances).once)
+
+          expect(subject).to(receive(:save_inventory)
+                               .with(array_including(instance_of(TopologicalInventory::Providers::Common::Collector::InventoryCollectionWrapper)),
+                                     anything, anything, anything, anything)
+                               .once)
+
+          expect(subject).to(receive(:save_inventory)
+                               .with(array_including(instance_of(TopologicalInventoryIngressApiClient::InventoryCollectionServiceInstance)),
+                                     anything, anything, anything, anything)
+                               .once)
 
           subject.refresh
         end

@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/ubi:8.2-343
+FROM registry.access.redhat.com/ubi8/ubi:8.3-227
 
 RUN dnf -y --disableplugin=subscription-manager module enable ruby:2.5 && \
     dnf -y --disableplugin=subscription-manager --setopt=tsflags=nodocs install \
@@ -15,8 +15,8 @@ RUN dnf -y --disableplugin=subscription-manager module enable ruby:2.5 && \
 ENV WORKDIR /opt/ansible-tower-collector/
 WORKDIR $WORKDIR
 
-COPY docker-assets/librdkafka-1.5.0.tar.gz /tmp/librdkafka.tar.gz
-RUN cd /tmp && tar -xf /tmp/librdkafka.tar.gz && cd librdkafka-1.5.0 && \
+COPY docker-assets/librdkafka-1.5.2.tar.gz /tmp/librdkafka.tar.gz
+RUN cd /tmp && tar -xf /tmp/librdkafka.tar.gz && cd librdkafka-1.5.2 && \
     ./configure --prefix=/usr && \
     make -j2 && make install && \
     rm -rf /tmp/librdkafka*

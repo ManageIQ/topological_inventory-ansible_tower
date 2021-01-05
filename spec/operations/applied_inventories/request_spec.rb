@@ -7,11 +7,12 @@ RSpec.describe TopologicalInventory::AnsibleTower::Operations::AppliedInventorie
 
   let(:account_number) { '123456' }
   let(:identity) { {"x-rh-identity" => Base64.strict_encode64({"identity" => {"account_number" => account_number, "user" => {"is_org_admin" => true}}}.to_json)} }
+  let(:metrics) { double('Metrics') }
   let(:topology_api_default) { double('Topological Inv. default API') }
   let(:topology_api) { double('Topological API Client', :api => topology_api_default) }
 
   subject do
-    operation = described_class.new({}, identity)
+    operation = described_class.new({}, identity, metrics)
     allow(operation).to receive(:topology_api).and_return(topology_api)
     operation
   end
@@ -34,8 +35,19 @@ RSpec.describe TopologicalInventory::AnsibleTower::Operations::AppliedInventorie
                                                       :state   => "completed",
                                                       :status  => "ok",
                                                       :context => {:applied_inventories => match_array(workflow_definition[:applied_inventories].map(&:id))})
-        subject.run
+        status = subject.run
+        expect(status).to eq(subject.operation_status[:success])
       end
+    end
+
+    it "processing with exception" do
+      allow(subject).to receive(:logger).and_return(double.as_null_object)
+
+      allow(subject).to receive(:update_task)
+      expect(topology_api_default).to receive(:show_service_offering).and_raise(TopologicalInventoryApiClient::ApiError)
+
+      expect(metrics).to receive(:record_error).with(:applied_inventories)
+      expect(subject.run).to eq(subject.operation_status[:error])
     end
   end
 end

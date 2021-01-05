@@ -1,3 +1,5 @@
+require 'topological_inventory/ansible_tower/collector/scheduler'
+
 RSpec.describe TopologicalInventory::AnsibleTower::CollectorsPool do
   let(:source) { double("Source") }
 
@@ -32,6 +34,12 @@ RSpec.describe TopologicalInventory::AnsibleTower::CollectorsPool do
   end
 
   describe ".new_collector" do
+    let(:scheduler) { TopologicalInventory::AnsibleTower::Collector::Scheduler.new }
+
+    before do
+      allow(subject).to receive(:scheduler).and_return(scheduler)
+    end
+
     it "creates public tower's collector if receptor_node blank" do
       allow(source).to receive_messages(:source        => SecureRandom.uuid,
                                         :scheme        => 'http',
@@ -39,6 +47,8 @@ RSpec.describe TopologicalInventory::AnsibleTower::CollectorsPool do
                                         :port          => 80,
                                         :receptor_node => nil)
       secret = {'username' => 'redhat', 'password' => 'secret_password'}
+
+      expect(scheduler).to receive(:add_source).with(source.source)
 
       collector = subject.new_collector(source, secret)
       expect(collector).to be_instance_of(TopologicalInventory::AnsibleTower::Cloud::Collector)
@@ -48,6 +58,8 @@ RSpec.describe TopologicalInventory::AnsibleTower::CollectorsPool do
       allow(source).to receive_messages(:source         => SecureRandom.uuid,
                                         :account_number => '123456',
                                         :receptor_node  => 'sample-node')
+
+      expect(scheduler).to receive(:add_source).with(source.source)
 
       collector = subject.new_collector(source, {})
       expect(collector).to be_instance_of(TopologicalInventory::AnsibleTower::Receptor::Collector)

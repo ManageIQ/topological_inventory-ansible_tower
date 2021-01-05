@@ -4,10 +4,14 @@ $LOAD_PATH << File.expand_path("../lib", __dir__)
 require "bundler/setup"
 require "active_support/core_ext/object/blank"
 require "optimist"
+require "topological_inventory/ansible_tower/operations/metrics"
 require "topological_inventory/ansible_tower/operations/worker"
 
 def parse_args
   Optimist.options do
+    opt :metrics_port, "Port to expose the metrics endpoint on, 0 to disable metrics",
+        :type => :integer, :default => (ENV["METRICS_PORT"] || 9394).to_i
+
     opt :queue_host, "Kafka messaging: hostname or IP", :type => :string, :default => ENV["QUEUE_HOST"] || "localhost"
     opt :queue_port, "Kafka messaging: port", :type => :integer, :default => (ENV["QUEUE_PORT"] || 9092).to_i
 
@@ -62,8 +66,15 @@ TopologicalInventory::AnsibleTower::MessagingClient.configure do |config|
   config.queue_port = args[:queue_port]
 end
 
+metrics           = TopologicalInventory::AnsibleTower::Operations::Metrics.new(args[:metrics_port])
+operations_worker = TopologicalInventory::AnsibleTower::Operations::Worker.new(metrics)
+
+Signal.trap("TERM") do
+  metrics.stop_server
+  exit
+end
+
 begin
-  operations_worker = TopologicalInventory::AnsibleTower::Operations::Worker.new
   operations_worker.run
 rescue => err
   puts err

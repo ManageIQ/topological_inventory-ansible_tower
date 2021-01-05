@@ -7,7 +7,10 @@ module TopologicalInventory::AnsibleTower
   class CollectorsPool < TopologicalInventory::Providers::Common::CollectorsPool
     include Logging
 
-    def initialize(config_name, metrics, collector_poll_time: nil, default_limit: 100, thread_pool_size: 2)
+    def initialize(config_name, metrics,
+                   collector_poll_time: TopologicalInventory::AnsibleTower::Collector::Scheduler.default.partial_refresh_frequency,
+                   default_limit: 100,
+                   thread_pool_size: 2)
       super(config_name, metrics, :collector_poll_time => collector_poll_time, :thread_pool_size => thread_pool_size)
       self.default_limit = default_limit
     end
@@ -35,6 +38,8 @@ module TopologicalInventory::AnsibleTower
     end
 
     def new_collector(source, secret)
+      scheduler.add_source(source.source)
+
       if source.receptor_node.to_s.strip.blank?
         url = URI::Generic.build(:scheme => source.scheme.to_s.strip.presence || 'https',
                                  :host   => source.host.to_s.strip,
@@ -60,5 +65,9 @@ module TopologicalInventory::AnsibleTower
     private
 
     attr_accessor :default_limit
+
+    def scheduler
+      TopologicalInventory::AnsibleTower::Collector::Scheduler.default
+    end
   end
 end
