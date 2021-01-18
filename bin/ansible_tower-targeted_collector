@@ -7,6 +7,7 @@ STDOUT.sync = true
 
 require "bundler/setup"
 require "topological_inventory/ansible_tower/targeted_refresh/worker"
+require "topological_inventory/ansible_tower/targeted_refresh/metrics"
 require "topological_inventory-ingress_api-client"
 
 def parse_args
@@ -18,8 +19,8 @@ def parse_args
         :type => :string, :default => ENV["TOPOLOGICAL_INVENTORY_INGRESS_API_SERVICE_HOST"] || "localhost"
     opt :ingress_api_port, "Ingress API service URL port",
         :type => :int, :default => (ENV["TOPOLOGICAL_INVENTORY_INGRESS_API_SERVICE_PORT"] || 9292).to_i
-    # opt :metrics_port, "Port to expose the metrics endpoint on, 0 to disable metrics",
-    #     :type => :integer, :default => (ENV["METRICS_PORT"] || 9394).to_i
+    opt :metrics_port, "Port to expose the metrics endpoint on, 0 to disable metrics",
+        :type => :integer, :default => (ENV["METRICS_PORT"] || 9394).to_i
     opt :sources_scheme, "Sources API scheme", :type => :string, :default => ENV["SOURCES_SCHEME"] || "http"
     opt :sources_host, "Sources API host name", :type => :string, :default => ENV["SOURCES_HOST"]
     opt :sources_port, "Sources API port", :type => :integer, :default => ENV["SOURCES_PORT"].to_i
@@ -67,8 +68,15 @@ ReceptorController::Client.configure do |config|
   config.pre_shared_key    = args[:receptor_controller_psk]
 end
 
+metrics = TopologicalInventory::AnsibleTower::TargetedRefresh::Metrics.new(args[:metrics_port])
+
+Signal.trap("TERM") do
+  metrics&.stop_server
+  exit
+end
+
 begin
-  targeted_collector = TopologicalInventory::AnsibleTower::TargetedRefresh::Worker.new
+  targeted_collector = TopologicalInventory::AnsibleTower::TargetedRefresh::Worker.new(metrics)
   targeted_collector.run
 rescue => err
   puts err

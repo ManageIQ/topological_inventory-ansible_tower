@@ -2,9 +2,10 @@ require "topological_inventory/ansible_tower/targeted_refresh/worker"
 
 RSpec.describe TopologicalInventory::AnsibleTower::TargetedRefresh::Worker do
   let(:client) { double("ManageIQ::Messaging::Client") }
+  let(:metrics) { double("Metrics", :record_error => nil) }
   let(:topic_name) { "platform.topological-inventory.collector-ansible-tower" }
 
-  subject { described_class.new }
+  subject { described_class.new(metrics) }
 
   before do
     allow(subject).to receive(:client).and_return(client)
@@ -42,16 +43,17 @@ RSpec.describe TopologicalInventory::AnsibleTower::TargetedRefresh::Worker do
 
     it "processes payload in the JSON format" do
       expect(TopologicalInventory::AnsibleTower::TargetedRefresh::Processor).to receive(:process!)
-        .with(message, 'key' => 'value')
+        .with(message, {'key' => 'value'}, metrics)
       subject.send(:process_message, message)
     end
 
-    it "raises an exception if payload isn't in JSON format" do
+    it "logs error and metrics if payload isn't in JSON format" do
       allow(subject).to receive(:logger).and_return(double('null_object').as_null_object)
       expect(subject.logger).to receive(:error).twice
+      expect(metrics).to receive(:record_error).twice
 
-      expect { subject.send(:process_message, message_unparsable) }.to raise_exception(JSON::ParserError)
-      expect { subject.send(:process_message, message_non_json) }.to raise_exception(TypeError)
+      subject.send(:process_message, message_unparsable)
+      subject.send(:process_message, message_non_json)
     end
   end
 end

@@ -13,6 +13,8 @@ module TopologicalInventory::AnsibleTower
       attr_accessor :transformation
       attr_reader :connection, :entity_type, :refresh_state_uuid, :refresh_state_started_at, :sweeping_enabled, :sweep_scope, :total_parts
 
+      delegate :metrics, :to => :collector
+
       def initialize(collector, connection, entity_type, refresh_state_uuid, refresh_state_started_at, sweeping_enabled: true)
         self.async_requests_remaining = Concurrent::AtomicFixnum.new
         self.collector = collector
@@ -42,13 +44,14 @@ module TopologicalInventory::AnsibleTower
           msg = "[ERROR] Collecting #{entity_type}, :source_uid => #{collector.send(:source)}, :refresh_state_uuid => #{refresh_state_uuid}); MSG ID: #{msg_id}, "
           msg += ":message => #{exception.message}\n#{exception.backtrace.join("\n")}"
           logger.error(msg)
+          metrics&.record_error(:receptor_error_response)
         ensure
           collector.response_received!
         end
 
         if entities.present?
           total_parts.increment
-          collector.async_save_inventory(refresh_state_uuid, parser)
+          collector.async_save_inventory(entity_type, refresh_state_uuid, parser)
           sweep_scope.merge(parser.collections.values.map(&:name))
         end
       rescue
@@ -58,11 +61,13 @@ module TopologicalInventory::AnsibleTower
       def on_error(msg_id, code, response)
         collector.response_received!
         logger.error("[ERROR] Collecting #{entity_type}, :source_uid => #{collector.send(:source)}, :refresh_state_uuid => #{refresh_state_uuid}); MSG ID: #{msg_id}, CODE: #{code}, RESPONSE: #{response}")
+        metrics&.record_error(:receptor_error_response)
       end
 
       def on_timeout(msg_id)
         collector.response_received!
         logger.error("[ERROR] Timeout when collecting #{entity_type}, :source_uid => #{collector.send(:source)}, :refresh_state_uuid => #{refresh_state_uuid}; MSG ID: #{msg_id}, ")
+        metrics&.record_error(:receptor_timeout)
       end
 
       # There can be multiple 'on_eof' calls
@@ -77,7 +82,7 @@ module TopologicalInventory::AnsibleTower
           # Sweeping is disabled for targeted_refresh and operations
           # and in case of errors
           if sweeping_enabled.value
-            collector.async_sweep_inventory(refresh_state_uuid, sweep_scope.to_a, total_parts.value, refresh_state_started_at)
+            collector.async_sweep_inventory(entity_type, refresh_state_uuid, sweep_scope.to_a, total_parts.value, refresh_state_started_at)
           end
         end
       end

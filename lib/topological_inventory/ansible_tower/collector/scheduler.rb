@@ -26,7 +26,7 @@ module TopologicalInventory
         end
 
         def add_source(source_uid)
-          timestamps[source_uid] = {:full_refresh => {}, :partial_refresh => {}}
+          timestamps.put_if_absent(source_uid, {:full_refresh => {}, :partial_refresh => {}})
         end
 
         def remove_source(source_uid)

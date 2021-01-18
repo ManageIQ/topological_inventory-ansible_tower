@@ -66,7 +66,7 @@ module TopologicalInventory::AnsibleTower
           logger.sweeping(:finish, source, sweep_scope, refresh_state_uuid)
         end
       rescue => e
-        metrics.record_error
+        metrics&.record_error(:cloud)
         logger.collecting_error(source, entity_type, refresh_state_uuid, e)
       end
     end

@@ -15,14 +15,13 @@ module TopologicalInventory
 
         REFS_PER_REQUEST_LIMIT = 20
 
-        def initialize(payload = {})
+        def initialize(payload = {}, metrics = nil)
           self.operation = 'ServiceInstance'
           self.params    = payload['params']
           self.source_id = payload['source_id']
 
           self.identity = params.to_a.first.to_h['request_context']
-          # TODO: add metrics exporter
-          super(payload['source_uid'], nil)
+          super(payload['source_uid'], metrics)
         end
 
         # Entrypoint for 'ServiceInstance.refresh' operation
@@ -57,22 +56,27 @@ module TopologicalInventory
 
           archive_not_received_service_instances unless on_premise?
         rescue => err
+          metrics_err_type = on_premise? ? :receptor : :cloud unless endpoint.nil?
+          metrics&.record_error(metrics_err_type || :general)
           logger.error_ext(operation, "Error: #{err.message}\n#{err.backtrace.join("\n")}")
         end
 
-        def async_save_inventory(refresh_state_uuid, parser)
+        def async_save_inventory(_entity_type, refresh_state_uuid, parser)
           refresh_state_part_collected_at = Time.now.utc
           refresh_state_part_uuid = SecureRandom.uuid
           save_inventory(parser.collections.values, inventory_name, schema_name, refresh_state_uuid, refresh_state_part_uuid, refresh_state_part_collected_at)
 
           remember_received_service_instances(parser)
+        rescue => e
+          logger.collecting_error(source, 'service_instances', refresh_state_uuid, e)
+          metrics&.record_error(:receptor)
         end
 
         def async_collecting_finished(entity_type, refresh_state_uuid, total_parts)
           logger.info_ext(operation, "Finished collecting of #{entity_type} (#{refresh_state_uuid}). Total parts: #{total_parts}")
           @parts_received_cnt.increment
 
-          archive_not_received_service_instances if @parts_requested_cnt == @parts_received_cnt.value
+          archive_not_received_service_instances if @parts_requested_cnt.value == @parts_received_cnt.value
         end
 
         private
@@ -88,6 +92,7 @@ module TopologicalInventory
           required_params.each do |attr|
             if (is_missing = send(attr).blank?)
               logger.error_ext(operation, "Missing #{attr} for the availability_check request [Source ID: #{source_id}]")
+              metrics&.record_error(:missing_params)
               break
             end
           end

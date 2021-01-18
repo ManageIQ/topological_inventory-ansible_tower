@@ -10,7 +10,7 @@ require "topological_inventory/ansible_tower/cloud/collector"
 require "topological_inventory/ansible_tower/receptor/collector"
 require "topological_inventory/ansible_tower/collectors_pool"
 require "topological_inventory/ansible_tower/collector/scheduler"
-require "topological_inventory/ansible_tower/collector/application_metrics"
+require "topological_inventory/ansible_tower/collector/metrics"
 
 def parse_args
   require 'optimist'
@@ -88,7 +88,7 @@ TopologicalInventory::AnsibleTower::Collector::Scheduler.configure do |config|
 end
 
 
-metrics = TopologicalInventory::AnsibleTower::Collector::ApplicationMetrics.new(args[:metrics_port])
+metrics = TopologicalInventory::AnsibleTower::Collector::Metrics.new(args[:metrics_port])
 if args[:config].nil?
   collector = if args[:receptor_node].blank?
                 TopologicalInventory::AnsibleTower::Cloud::Collector.new(args[:source],
@@ -106,11 +106,8 @@ if args[:config].nil?
 
   scheduler = TopologicalInventory::AnsibleTower::Collector::Scheduler.default
   scheduler.add_source(args[:source])
-
-  collector.collect!
 else
   pool = TopologicalInventory::AnsibleTower::CollectorsPool.new(args[:config], metrics, :default_limit => args[:page_size])
-  pool.run!
 end
 
 Signal.trap("TERM") do
@@ -120,4 +117,10 @@ Signal.trap("TERM") do
     TopologicalInventory::AnsibleTower::ConnectionManager.stop_receptor_client
   end
   exit
+end
+
+if args[:config].nil?
+  collector.collect!
+else
+  pool.run!
 end

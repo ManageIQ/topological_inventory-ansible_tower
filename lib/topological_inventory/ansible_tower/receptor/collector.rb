@@ -49,14 +49,18 @@ module TopologicalInventory::AnsibleTower
         logger.collecting(:finish, source, entity_type, refresh_state_uuid, total_parts)
       end
 
-      def async_save_inventory(refresh_state_uuid, parser)
+      def async_save_inventory(entity_type, refresh_state_uuid, parser)
         refresh_state_part_collected_at = Time.now.utc
         refresh_state_part_uuid = SecureRandom.uuid
         save_inventory(parser.collections.values, inventory_name, schema_name, refresh_state_uuid, refresh_state_part_uuid, refresh_state_part_collected_at)
+      rescue => e
+        logger.collecting_error(source, entity_type, refresh_state_uuid, e)
+        metrics&.record_error(:receptor)
+        raise e
       end
 
       # Not called by partial refresh
-      def async_sweep_inventory(refresh_state_uuid, sweep_scope, total_parts, refresh_state_started_at)
+      def async_sweep_inventory(entity_type, refresh_state_uuid, sweep_scope, total_parts, refresh_state_started_at)
         logger.sweeping(:start, source, sweep_scope, refresh_state_uuid)
 
         logger.debug("Received #{entity_types_collected_cnt.value} of #{service_catalog_entity_types.size} complete responses")
@@ -65,6 +69,9 @@ module TopologicalInventory::AnsibleTower
         entity_types_collected_cnt.increment # Real finish of entity_type's requests
 
         logger.sweeping(:finish, source, sweep_scope, refresh_state_uuid)
+      rescue => e
+        logger.collecting_error(source, entity_type, refresh_state_uuid, e)
+        metrics&.record_error(:receptor)
       end
 
       def response_received!
@@ -95,6 +102,7 @@ module TopologicalInventory::AnsibleTower
               sleep(10)
             else
               logger.error("[ASYNC] Collector for source_uid: #{source}: No responses received. Waiting finished")
+              metrics&.record_error(:receptor_waiting)
               break
             end
           elsif last_response_at >= (ReceptorController::Client::Configuration.default.response_timeout + 10.seconds).ago.utc
@@ -105,6 +113,7 @@ module TopologicalInventory::AnsibleTower
             sleep(10)
           else # last_response_at < max_wait_sync_threshold.minutes.ago
             logger.error("[ASYNC] Collector for source_uid: #{source}: Only #{entity_types_collected_cnt.value} of #{service_catalog_entity_types.size} entity types were successfully received. Waiting finished")
+            metrics&.record_error(:receptor_waiting)
             break
           end
         end

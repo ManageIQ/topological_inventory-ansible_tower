@@ -12,14 +12,15 @@ module TopologicalInventory
         # Messages older than threshold are skipped
         SENT_AT_THRESHOLD = 300
 
-        def self.process!(message, payload)
+        def self.process!(message, payload, metrics)
           model, method = message.message.to_s.split(".")
-          new(model, method, payload).process
+          new(model, method, payload, metrics).process
         end
 
-        def initialize(model, method, payload)
-          self.model = model
-          self.method = method
+        def initialize(model, method, payload, metrics)
+          self.model   = model
+          self.method  = method
+          self.metrics = metrics
           self.payload = payload
           self.sent_at_threshold = (ENV['SENT_AT_THRESHOLD'] || SENT_AT_THRESHOLD).to_i.seconds
         end
@@ -28,7 +29,7 @@ module TopologicalInventory
           return if skip_old_payload?
 
           logger.info(status_log_msg)
-          impl = "#{TargetedRefresh}::#{model}".safe_constantize&.new(payload)
+          impl = "#{TargetedRefresh}::#{model}".safe_constantize&.new(payload, metrics)
           if impl&.respond_to?(method)
             result = impl&.send(method)
 
@@ -43,7 +44,7 @@ module TopologicalInventory
 
         private
 
-        attr_accessor :identity, :model, :method, :payload, :sent_at_threshold
+        attr_accessor :identity, :metrics, :model, :method, :payload, :sent_at_threshold
 
         def skip_old_payload?
           sent_at = Time.parse(payload['sent_at']).utc

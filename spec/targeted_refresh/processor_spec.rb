@@ -1,6 +1,8 @@
 require 'topological_inventory/ansible_tower/targeted_refresh/processor'
 
 RSpec.describe TopologicalInventory::AnsibleTower::TargetedRefresh::Processor do
+  let(:metrics) { double("Metrics") }
+
   describe "#self.process!" do
     let(:message) { double(:message => 'SomeModel.some_method') }
     let(:payload) { double("Payload") }
@@ -9,10 +11,10 @@ RSpec.describe TopologicalInventory::AnsibleTower::TargetedRefresh::Processor do
       processor = double(:process => nil)
 
       expect(described_class).to receive(:new)
-        .with('SomeModel', 'some_method', payload)
+        .with('SomeModel', 'some_method', payload, metrics)
         .and_return(processor)
 
-      described_class.process!(message, payload)
+      described_class.process!(message, payload, metrics)
     end
   end
 
@@ -30,12 +32,12 @@ RSpec.describe TopologicalInventory::AnsibleTower::TargetedRefresh::Processor do
                })
       end
 
-      subject { described_class.new('ServiceInstance', 'refresh', message.payload) }
+      subject { described_class.new('ServiceInstance', 'refresh', message.payload, metrics) }
 
       it "call the operation" do
         operation = double(:refresh => nil)
         expect(TopologicalInventory::AnsibleTower::TargetedRefresh::ServiceInstance).to receive(:new)
-          .with(message.payload)
+          .with(message.payload, metrics)
           .and_return(operation)
 
         expect(operation).to receive(:refresh)
@@ -47,7 +49,7 @@ RSpec.describe TopologicalInventory::AnsibleTower::TargetedRefresh::Processor do
     context "on operation without valid timestamp" do
       let(:job_refs) { %w[10 20] }
 
-      subject { described_class.new('ServiceInstance', 'refresh', message.payload) }
+      subject { described_class.new('ServiceInstance', 'refresh', message.payload, nil) }
 
       context "without timestamp" do
         let(:message) do
@@ -102,7 +104,7 @@ RSpec.describe TopologicalInventory::AnsibleTower::TargetedRefresh::Processor do
                }.to_json)
       end
 
-      subject { described_class.new('SomeModel', 'some_method', JSON.parse(message.payload)) }
+      subject { described_class.new('SomeModel', 'some_method', JSON.parse(message.payload), nil) }
 
       it "logs warning with all the Task ids" do
         allow(subject).to receive(:update_tasks)

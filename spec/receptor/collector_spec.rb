@@ -105,7 +105,7 @@ RSpec.describe TopologicalInventory::AnsibleTower::Receptor::Collector do
       allow(SecureRandom).to receive(:uuid).and_return('refresh_state_part_uuid')
 
       expect(subject).to receive(:save_inventory).with(%i[v1 v2], inventory_name, schema_name, 'refresh_state_uuid', 'refresh_state_part_uuid', now)
-      subject.async_save_inventory('refresh_state_uuid', parser)
+      subject.async_save_inventory('some_entity', 'refresh_state_uuid', parser)
     end
   end
 
@@ -116,7 +116,7 @@ RSpec.describe TopologicalInventory::AnsibleTower::Receptor::Collector do
       expect(TopologicalInventory::AnsibleTower.logger).to receive(:sweeping).twice
 
       expect(subject).to receive(:sweep_inventory).with(inventory_name, schema_name, 'refresh_state_uuid', total_parts, 'sweep_scope', now)
-      subject.async_sweep_inventory('refresh_state_uuid', 'sweep_scope', total_parts, now)
+      subject.async_sweep_inventory('some_entity', 'refresh_state_uuid', 'sweep_scope', total_parts, now)
     end
   end
 end
