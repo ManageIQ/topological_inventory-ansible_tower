@@ -6,6 +6,7 @@ require "active_support/core_ext/object/blank"
 require "optimist"
 require "topological_inventory/ansible_tower/operations/metrics"
 require "topological_inventory/ansible_tower/operations/worker"
+require "topological_inventory/providers/common/clowder_config"
 
 def parse_args
   Optimist.options do
@@ -40,6 +41,9 @@ def check_args(args)
 end
 
 args = parse_args
+if TopologicalInventory::Providers::Common::ClowderConfig.clowder_enabled?
+  TopologicalInventory::Providers::Common::ClowderConfig.fill_args_operations(args)
+end
 check_args(args)
 
 TopologicalInventoryApiClient.configure do |config|
@@ -58,6 +62,7 @@ ReceptorController::Client.configure do |config|
   config.controller_host   = "#{args[:receptor_controller_host]}:#{args[:receptor_controller_port]}"
   config.queue_host        = args[:queue_host]
   config.queue_port        = args[:queue_port]
+  config.queue_topic       = TopologicalInventory::Providers::Common::ClowderConfig.kafka_topic(config.queue_topic)
   config.pre_shared_key    = args[:receptor_controller_psk]
 end
 

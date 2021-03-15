@@ -9,6 +9,7 @@ require "bundler/setup"
 require "topological_inventory/ansible_tower/targeted_refresh/worker"
 require "topological_inventory/ansible_tower/targeted_refresh/metrics"
 require "topological_inventory-ingress_api-client"
+require "topological_inventory/providers/common/clowder_config"
 
 def parse_args
   require 'optimist'
@@ -42,6 +43,9 @@ def check_args(args)
 end
 
 args = parse_args
+if TopologicalInventory::Providers::Common::ClowderConfig.clowder_enabled?
+  TopologicalInventory::Providers::Common::ClowderConfig.fill_args_operations(args)
+end
 check_args(args)
 
 TopologicalInventoryIngressApiClient.configure do |config|
@@ -65,6 +69,7 @@ ReceptorController::Client.configure do |config|
   config.controller_host   = "#{args[:receptor_controller_host]}:#{args[:receptor_controller_port]}"
   config.queue_host        = args[:queue_host]
   config.queue_port        = args[:queue_port]
+  config.queue_topic       = TopologicalInventory::Providers::Common::ClowderConfig.kafka_topic(config.queue_topic)
   config.pre_shared_key    = args[:receptor_controller_psk]
 end
 
