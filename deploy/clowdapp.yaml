@@ -7,6 +7,9 @@ objects:
   kind: ClowdApp
   metadata:
     name: topo-ansible-tower
+    labels:
+      app: topological-inventory
+      clowdapp: topo-ansible-tower
   spec:
     envName: ${ENV_NAME}
     deployments:
