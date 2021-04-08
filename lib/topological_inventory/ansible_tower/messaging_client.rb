@@ -1,4 +1,6 @@
 require "manageiq-messaging"
+require "topological_inventory/providers/common/messaging_client"
+require "topological_inventory/providers/common/clowder_config"
 
 module TopologicalInventory
   module AnsibleTower
@@ -24,14 +26,14 @@ module TopologicalInventory
         {
           :auto_ack    => false,
           :max_bytes   => 50_000,
-          :service     => OPERATIONS_QUEUE_NAME,
+          :service     => TopologicalInventory::Providers::Common::ClowderConfig.kafka_topic(OPERATIONS_QUEUE_NAME),
           :persist_ref => "topological-inventory-operations-ansible-tower"
         }
       end
 
       def targeted_refresh_listener_queue_opts
         {
-          :service     => REFRESH_QUEUE_NAME,
+          :service     => TopologicalInventory::Providers::Common::ClowderConfig.kafka_topic(REFRESH_QUEUE_NAME),
           :persist_ref => "topological-inventory-collector-ansible-tower"
         }
       end

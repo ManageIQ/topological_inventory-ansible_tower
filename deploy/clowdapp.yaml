@@ -1,0 +1,220 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: topological-inventory-ansible-tower
+objects:
+- apiVersion: cloud.redhat.com/v1alpha1
+  kind: ClowdApp
+  metadata:
+    name: topo-ansible-tower
+  spec:
+    envName: ${ENV_NAME}
+    deployments:
+    - name: targeted-collector
+      minReplicas: ${{MIN_REPLICAS_TC}}
+      webServices:
+        public:
+          enabled: false
+      podSpec:
+        image: ${IMAGE}:${IMAGE_TAG}
+        command:
+        - bin/ansible_tower-targeted_collector
+        env:
+        - name: LOG_LEVEL
+          value: ${LOG_LEVEL}
+        - name: SOURCES_HOST
+          value: ${SOURCES_HOST}
+        - name: SOURCES_PORT
+          value: ${SOURCES_PORT}
+        - name: SOURCES_SCHEME
+          value: ${SOURCES_SCHEME}
+        - name: RECEPTOR_CONTROLLER_HOST
+          value: ${RECEPTOR_CONTROLLER_HOST}
+        - name: RECEPTOR_CONTROLLER_PORT
+          value: ${RECEPTOR_CONTROLLER_PORT}
+        - name: RECEPTOR_CONTROLLER_SCHEME
+          value: ${RECEPTOR_CONTROLLER_SCHEME}
+        - name: RECEPTOR_CONTROLLER_PSK
+          valueFrom:
+            secretKeyRef:
+              name: ${RECEPTOR_CONTROLLER_SECRET_NAME}
+              key: ${RECEPTOR_CONTROLLER_SECRET_KEY_PSK}
+        - name: TOPOLOGICAL_INVENTORY_INGRESS_API_HOST
+          value: ${TOPOLOGICAL_INVENTORY_INGRESS_API_HOST}
+        - name: TOPOLOGICAL_INVENTORY_INGRESS_API_PORT
+          value: ${TOPOLOGICAL_INVENTORY_INGRESS_API_PORT}
+        - name: TOPOLOGICAL_INVENTORY_INGRESS_API_SCHEME}
+          value: ${TOPOLOGICAL_INVENTORY_INGRESS_API_SCHEME}
+        resources:
+          limits:
+            cpu: ${CPU_LIMIT_TC}
+            memory: ${MEMORY_LIMIT_TC}
+          requests:
+            cpu: ${CPU_REQUEST_TC}
+            memory: ${MEMORY_REQUEST_TC}
+    - name: operations
+      minReplicas: ${{MIN_REPLICAS_OPS}}
+      webServices:
+        public:
+          enabled: false
+      podSpec:
+        image: ${IMAGE}:${IMAGE_TAG}
+        command:
+        - bin/ansible_tower-operations
+        env:
+        - name: LOG_LEVEL
+          value: ${LOG_LEVEL}
+        - name: SOURCES_HOST
+          value: ${SOURCES_HOST}
+        - name: SOURCES_PORT
+          value: ${SOURCES_PORT}
+        - name: SOURCES_SCHEME
+          value: ${SOURCES_SCHEME}
+        - name: RECEPTOR_CONTROLLER_HOST
+          value: ${RECEPTOR_CONTROLLER_HOST}
+        - name: RECEPTOR_CONTROLLER_PORT
+          value: ${RECEPTOR_CONTROLLER_PORT}
+        - name: RECEPTOR_CONTROLLER_SCHEME
+          value: ${RECEPTOR_CONTROLLER_SCHEME}
+        - name: RECEPTOR_CONTROLLER_PSK
+          valueFrom:
+            secretKeyRef:
+              name: ${RECEPTOR_CONTROLLER_SECRET_NAME}
+              key: ${RECEPTOR_CONTROLLER_SECRET_KEY_PSK}
+        - name: TOPOLOGICAL_INVENTORY_HOST
+          value: ${TOPOLOGICAL_INVENTORY_HOST}
+        - name: TOPOLOGICAL_INVENTORY_PORT
+          value: ${TOPOLOGICAL_INVENTORY_PORT}
+        - name: TOPOLOGICAL_INVENTORY_SCHEME}
+          value: ${TOPOLOGICAL_INVENTORY_SCHEME}
+        - name: UPDATE_SOURCES_VIA_API
+          value: ${UPDATE_SOURCES_VIA_API}
+        livenessProbe:
+          exec:
+            command:
+            - bash
+            - -c
+            - find /tmp -mmin -60 2>/dev/null | grep healthy
+          initialDelaySeconds: 1800
+          periodSeconds: 300
+        resources:
+          limits:
+            cpu: ${CPU_LIMIT_OPS}
+            memory: ${MEMORY_LIMIT_OPS}
+          requests:
+            cpu: ${CPU_REQUEST_OPS}
+            memory: ${MEMORY_REQUEST_OPS}
+    kafkaTopics:
+    - topicName: platform.sources.status
+      partitions: 3
+      replicas: 3
+    - topicName: platform.topological-inventory.operations-ansible-tower
+      partitions: 3
+      replicas: 3
+    - topicName: platform.topological-inventory.collector-ansible-tower
+      partitions: 3
+      replicas: 3
+    - topicName: platform.receptor-controller.responses
+      partitions: 3
+      replicas: 3
+parameters:
+- description: CPU Limit for operations worker
+  name: CPU_LIMIT_OPS
+  value: 200m
+- description: CPU Limit for targeted collector
+  name: CPU_LIMIT_TC
+  value: 200m
+- description: CPU Request for operations worker
+  name: CPU_REQUEST_OPS
+  value: 100m
+- description: CPU Request for targeted collector
+  name: CPU_REQUEST_TC
+  value: 100m
+- description: Clowder ENV
+  name: ENV_NAME
+  required: true
+- description: Image
+  name: IMAGE
+  value: quay.io/cloudservices/topological-inventory-ansible-tower
+- description: Image tag
+  name: IMAGE_TAG
+  required: true
+- name: LOG_LEVEL
+  value: WARN
+- description: Memory limit for operations worker
+  name: MEMORY_LIMIT_OPS
+  value: 200Mi
+- description: Memory limit for targeted collector
+  name: MEMORY_LIMIT_TC
+  value: 250Mi
+- description: Memory request for operations worker
+  name: MEMORY_REQUEST_OPS
+  value: 100Mi
+- description: Memory limit for targeted collector
+  name: MEMORY_REQUEST_TC
+  value: 100Mi
+- description: The number of replicas to use for the prometheus deployment (operations)
+  name: MIN_REPLICAS_OPS
+  value: '1'
+- description: The number of replicas to use for the prometheus deployment (targeted collector)
+  name: MIN_REPLICAS_TC
+  value: '1'
+- name: RECEPTOR_CONTROLLER_HOST
+  displayName: Receptor Controller Host
+  description: Hostname of the receptor controller
+  value: ""
+- name: RECEPTOR_CONTROLLER_PORT
+  displayName: Receptor Controller Port
+  description: Port of the receptor controller
+  value: "9090"
+- name: RECEPTOR_CONTROLLER_SCHEME
+  displayName: Receptor Controller Scheme
+  description: Scheme to use for the receptor controller
+  value: http
+- name: RECEPTOR_CONTROLLER_SECRET_NAME
+  displayName: Receptor secret name
+  description: Name of the Receptor PSK secret
+  value: receptor
+- name: RECEPTOR_CONTROLLER_SECRET_KEY_PSK
+  displayName: PSK key name in the Receptor secret
+  description: Name of the key in the RECEPTOR_CONTROLLER_SECRET_NAME
+  value: RECEPTOR_CONTROLLER_PSK
+- description: Host to use for the Sources service URL.
+  displayName: Sources Service Host
+  name: SOURCES_HOST
+  required: true
+  value: sources-api
+- description: Port to use for the Sources service URL.
+  displayName: Sources Service Port
+  name: SOURCES_PORT
+  value: '8000'
+- description: Scheme to use for the Sources service URL.
+  displayName: Sources Service Scheme
+  name: SOURCES_SCHEME
+  value: http
+- name: TOPOLOGICAL_INVENTORY_INGRESS_API_HOST
+  displayName: Topological Inventory Ingress API Host
+  description: Host to use for the topological inventory ingress api service URL.
+  value: topo-ingress-api-svc
+- name: TOPOLOGICAL_INVENTORY_INGRESS_API_PORT
+  displayName: Topological Inventory Ingress API Port
+  description: Port to use for the topological inventory ingress api service URL.
+  value: "8000"
+- name: TOPOLOGICAL_INVENTORY_INGRESS_API_SCHEME
+  displayName: Topological Inventory Ingress API Scheme
+  description: Scheme to use for the topological inventory ingress api service URL. Can be either http or https
+  value: http
+- name: TOPOLOGICAL_INVENTORY_HOST
+  displayName: Topological Inventory Host
+  description: Host to use for the topological inventory service URL.
+  value: topo-api-svc
+- name: TOPOLOGICAL_INVENTORY_PORT
+  displayName: Topological Inventory Port
+  description: Port to use for the topological inventory service URL.
+  value: "8000"
+- name: TOPOLOGICAL_INVENTORY_SCHEME
+  displayName: Topological Inventory Scheme
+  description: Scheme to use for the topological inventory service URL. Can be either http or https
+  value: http
+- name: UPDATE_SOURCES_VIA_API
+  value: ''
