@@ -15,10 +15,9 @@ def parse_args
   Optimist.options do
     opt :queue_host, "Kafka messaging: hostname or IP", :type => :string, :default => ENV["QUEUE_HOST"] || "localhost"
     opt :queue_port, "Kafka messaging: port", :type => :integer, :default => (ENV["QUEUE_PORT"] || 9092).to_i
-    opt :ingress_api_host, "Ingress API service URL",
-        :type => :string, :default => ENV["TOPOLOGICAL_INVENTORY_INGRESS_API_SERVICE_HOST"] || "localhost"
-    opt :ingress_api_port, "Ingress API service URL port",
-        :type => :int, :default => (ENV["TOPOLOGICAL_INVENTORY_INGRESS_API_SERVICE_PORT"] || 9292).to_i
+    opt :ingress_api_scheme, "Ingress API scheme", :type => :string, :default => ENV["TOPOLOGICAL_INVENTORY_INGRESS_API_SCHEME"] || "http"
+    opt :ingress_api_host, "Ingress API service URL", :type => :string, :default => ENV["TOPOLOGICAL_INVENTORY_INGRESS_API_HOST"] || "localhost"
+    opt :ingress_api_port, "Ingress API service URL port", :type => :int, :default => (ENV["TOPOLOGICAL_INVENTORY_INGRESS_API_PORT"] || 9292).to_i
     opt :metrics_port, "Port to expose the metrics endpoint on, 0 to disable metrics",
         :type => :integer, :default => (ENV["METRICS_PORT"] || 9394).to_i
     opt :sources_scheme, "Sources API scheme", :type => :string, :default => ENV["SOURCES_SCHEME"] || "http"
